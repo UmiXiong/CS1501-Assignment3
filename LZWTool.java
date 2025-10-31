@@ -7,6 +7,8 @@ import java.util.*;
  */
 public class LZWTool {
 
+//    private static boolean DEBUG = false;
+
     public static void main(String[] args) {
         // Parse command-line arguments
         String mode = null;
@@ -149,6 +151,7 @@ public class LZWTool {
             char c = BinaryStdIn.readChar(8);
             info.alphabet.add(String.valueOf(c));
         }
+
 
         return info;
     }
@@ -386,6 +389,7 @@ public class LZWTool {
                 // End of stream reached
                 break;
             }
+
 
             // Check for stop code
             int stopCode = (1 << W) - 1;
