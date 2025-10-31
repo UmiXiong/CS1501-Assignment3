@@ -7,8 +7,6 @@ import java.util.*;
  */
 public class LZWTool {
 
-//    private static boolean DEBUG = false;
-
     public static void main(String[] args) {
         // Parse command-line arguments
         String mode = null;
@@ -152,7 +150,6 @@ public class LZWTool {
             info.alphabet.add(String.valueOf(c));
         }
 
-
         return info;
     }
 
@@ -166,16 +163,22 @@ public class LZWTool {
         // Write header
         writeHeader(minW, maxW, policy, alphabet);
 
+        // Prepare reserved code set: reserve (1<<w)-1 for each w in [minW,maxW]
+        Set<Integer> reserved = new HashSet<>();
+        for (int w = minW; w <= maxW; w++) reserved.add((1 << w) - 1);
+
         // Initialize compression state
         int W = minW;
         int maxCodeLimit = (1 << maxW);
 
-        // Build initial codebook: use HashMap for pattern->code so we can remove old patterns when evicting
+        // Build initial codebook
         Map<String, Integer> codebook = new HashMap<>();
         Map<Integer, String> reverseCodebook = new HashMap<>();
         int nextCode = 0;
 
         for (String symbol : alphabet) {
+            // ensure initial codes skip reserved if collision (very unlikely when symbol count small)
+            while (reserved.contains(nextCode) && nextCode < maxCodeLimit) nextCode++;
             codebook.put(symbol, nextCode);
             reverseCodebook.put(nextCode, symbol);
             nextCode++;
@@ -204,8 +207,8 @@ public class LZWTool {
             } else {
                 // Output code for current
                 if (current.length() > 0) {
-                    String currentStr = current.toString();
-                    Integer code = codebook.get(currentStr);
+                    String curStr = current.toString();
+                    Integer code = codebook.get(curStr);
                     if (code != null) {
                         BinaryStdOut.write(code, W);
                         frequency.put(code, frequency.getOrDefault(code, 0) + 1);
@@ -215,27 +218,31 @@ public class LZWTool {
 
                 // Try to add new pattern
                 if (nextCode < maxCodeLimit) {
-                    // Increase width if needed BEFORE adding the new code
+                    // skip reserved indices first
+                    while (reserved.contains(nextCode) && nextCode < maxCodeLimit) nextCode++;
+
+                    // Increase width if needed BEFORE adding the new code (after skipping)
                     if (nextCode == (1 << W) && W < maxW) {
                         W++;
                     }
 
-                    codebook.put(nextStr, nextCode);
-                    reverseCodebook.put(nextCode, nextStr);
-                    frequency.put(nextCode, 0);
-                    lastUsed.put(nextCode, timestamp);
-                    nextCode++;
+                    if (nextCode < maxCodeLimit) {
+                        codebook.put(nextStr, nextCode);
+                        reverseCodebook.put(nextCode, nextStr);
+                        frequency.put(nextCode, 0);
+                        lastUsed.put(nextCode, timestamp);
+                        nextCode++;
+                    }
                 } else {
                     // Codebook full - apply eviction policy
                     if (policy.equals("reset")) {
                         // Reset to alphabet only
-                        codebook = new HashMap<>();
+                        codebook.clear();
                         reverseCodebook.clear();
-                        frequency.clear();
-                        lastUsed.clear();
                         nextCode = 0;
 
                         for (String symbol : alphabet) {
+                            while (reserved.contains(nextCode) && nextCode < maxCodeLimit) nextCode++;
                             codebook.put(symbol, nextCode);
                             reverseCodebook.put(nextCode, symbol);
                             frequency.put(nextCode, 0);
@@ -246,15 +253,15 @@ public class LZWTool {
                         W = minW;
 
                         // Add the new pattern
-                        if (nextCode == (1 << W) && W < maxW) {
-                            W++;
+                        while (reserved.contains(nextCode) && nextCode < maxCodeLimit) nextCode++;
+                        if (nextCode == (1 << W) && W < maxW) W++;
+                        if (nextCode < maxCodeLimit) {
+                            codebook.put(nextStr, nextCode);
+                            reverseCodebook.put(nextCode, nextStr);
+                            frequency.put(nextCode, 0);
+                            lastUsed.put(nextCode, timestamp);
+                            nextCode++;
                         }
-
-                        codebook.put(nextStr, nextCode);
-                        reverseCodebook.put(nextCode, nextStr);
-                        frequency.put(nextCode, 0);
-                        lastUsed.put(nextCode, timestamp);
-                        nextCode++;
                     } else if (policy.equals("lru")) {
                         // Find LRU code (excluding alphabet)
                         int lruCode = -1;
@@ -272,10 +279,10 @@ public class LZWTool {
 
                         if (lruCode >= 0) {
                             String oldPattern = reverseCodebook.get(lruCode);
-                            // remove old pattern from pattern->code map to keep consistency
                             if (oldPattern != null) {
                                 codebook.remove(oldPattern);
                             }
+                            reverseCodebook.remove(lruCode);
 
                             // Replace with new pattern
                             codebook.put(nextStr, lruCode);
@@ -303,6 +310,7 @@ public class LZWTool {
                             if (oldPattern != null) {
                                 codebook.remove(oldPattern);
                             }
+                            reverseCodebook.remove(lfuCode);
 
                             // Replace with new pattern
                             codebook.put(nextStr, lfuCode);
@@ -340,6 +348,10 @@ public class LZWTool {
         // Read header
         HeaderInfo info = readHeader();
 
+        // Prepare reserved code set (must match compressor)
+        Set<Integer> reserved = new HashSet<>();
+        for (int w = info.minW; w <= info.maxW; w++) reserved.add((1 << w) - 1);
+
         int W = info.minW;
         int maxCodeLimit = (1 << info.maxW);
 
@@ -348,6 +360,7 @@ public class LZWTool {
         int nextCode = 0;
 
         for (String symbol : info.alphabet) {
+            while (reserved.contains(nextCode) && nextCode < maxCodeLimit) nextCode++;
             codebook.put(nextCode++, symbol);
         }
 
@@ -399,7 +412,6 @@ public class LZWTool {
                 break;
             }
 
-
             // Check for stop code
             int stopCode = (1 << W) - 1;
             if (code == stopCode) {
@@ -423,16 +435,21 @@ public class LZWTool {
 
             // Add new entry to codebook
             if (nextCode < maxCodeLimit) {
+                // skip reserved indices first
+                while (reserved.contains(nextCode) && nextCode < maxCodeLimit) nextCode++;
+
                 // Check if we need to increase width BEFORE adding
                 if (nextCode == (1 << W) && W < info.maxW) {
                     W++;
                 }
 
-                String newEntry = prevString + entry.charAt(0);
-                codebook.put(nextCode, newEntry);
-                frequency.put(nextCode, 0);
-                lastUsed.put(nextCode, timestamp);
-                nextCode++;
+                if (nextCode < maxCodeLimit) {
+                    String newEntry = prevString + entry.charAt(0);
+                    codebook.put(nextCode, newEntry);
+                    frequency.put(nextCode, 0);
+                    lastUsed.put(nextCode, timestamp);
+                    nextCode++;
+                }
             } else {
                 // Codebook full - apply eviction policy
                 if (info.policy.equals("reset")) {
@@ -441,6 +458,7 @@ public class LZWTool {
                     nextCode = 0;
 
                     for (String symbol : info.alphabet) {
+                        while (reserved.contains(nextCode) && nextCode < maxCodeLimit) nextCode++;
                         codebook.put(nextCode, symbol);
                         frequency.put(nextCode, 0);
                         lastUsed.put(nextCode, timestamp);
@@ -450,15 +468,16 @@ public class LZWTool {
                     W = info.minW;
 
                     // Add the new pattern
-                    if (nextCode == (1 << W) && W < info.maxW) {
-                        W++;
-                    }
+                    while (reserved.contains(nextCode) && nextCode < maxCodeLimit) nextCode++;
+                    if (nextCode == (1 << W) && W < info.maxW) W++;
 
-                    String newEntry = prevString + entry.charAt(0);
-                    codebook.put(nextCode, newEntry);
-                    frequency.put(nextCode, 0);
-                    lastUsed.put(nextCode, timestamp);
-                    nextCode++;
+                    if (nextCode < maxCodeLimit) {
+                        String newEntry = prevString + entry.charAt(0);
+                        codebook.put(nextCode, newEntry);
+                        frequency.put(nextCode, 0);
+                        lastUsed.put(nextCode, timestamp);
+                        nextCode++;
+                    }
                 } else if (info.policy.equals("lru")) {
                     // Find LRU code (excluding alphabet)
                     int lruCode = -1;
