@@ -170,13 +170,13 @@ public class LZWTool {
         int W = minW;
         int maxCodeLimit = (1 << maxW);
 
-        // Build initial codebook
-        TSTmod<Integer> codebook = new TSTmod<>();
+        // Build initial codebook: use HashMap for pattern->code so we can remove old patterns when evicting
+        Map<String, Integer> codebook = new HashMap<>();
         Map<Integer, String> reverseCodebook = new HashMap<>();
         int nextCode = 0;
 
         for (String symbol : alphabet) {
-            codebook.put(new StringBuilder(symbol), nextCode);
+            codebook.put(symbol, nextCode);
             reverseCodebook.put(nextCode, symbol);
             nextCode++;
         }
@@ -197,13 +197,15 @@ public class LZWTool {
         while (!BinaryStdIn.isEmpty()) {
             char c = BinaryStdIn.readChar(8);
             StringBuilder next = new StringBuilder(current).append(c);
+            String nextStr = next.toString();
 
-            if (codebook.contains(next)) {
+            if (codebook.containsKey(nextStr)) {
                 current = next;
             } else {
                 // Output code for current
                 if (current.length() > 0) {
-                    Integer code = codebook.get(current);
+                    String currentStr = current.toString();
+                    Integer code = codebook.get(currentStr);
                     if (code != null) {
                         BinaryStdOut.write(code, W);
                         frequency.put(code, frequency.getOrDefault(code, 0) + 1);
@@ -218,8 +220,8 @@ public class LZWTool {
                         W++;
                     }
 
-                    codebook.put(new StringBuilder(next), nextCode);
-                    reverseCodebook.put(nextCode, next.toString());
+                    codebook.put(nextStr, nextCode);
+                    reverseCodebook.put(nextCode, nextStr);
                     frequency.put(nextCode, 0);
                     lastUsed.put(nextCode, timestamp);
                     nextCode++;
@@ -227,12 +229,14 @@ public class LZWTool {
                     // Codebook full - apply eviction policy
                     if (policy.equals("reset")) {
                         // Reset to alphabet only
-                        codebook = new TSTmod<>();
+                        codebook = new HashMap<>();
                         reverseCodebook.clear();
+                        frequency.clear();
+                        lastUsed.clear();
                         nextCode = 0;
 
                         for (String symbol : alphabet) {
-                            codebook.put(new StringBuilder(symbol), nextCode);
+                            codebook.put(symbol, nextCode);
                             reverseCodebook.put(nextCode, symbol);
                             frequency.put(nextCode, 0);
                             lastUsed.put(nextCode, timestamp);
@@ -246,8 +250,8 @@ public class LZWTool {
                             W++;
                         }
 
-                        codebook.put(new StringBuilder(next), nextCode);
-                        reverseCodebook.put(nextCode, next.toString());
+                        codebook.put(nextStr, nextCode);
+                        reverseCodebook.put(nextCode, nextStr);
                         frequency.put(nextCode, 0);
                         lastUsed.put(nextCode, timestamp);
                         nextCode++;
@@ -268,11 +272,14 @@ public class LZWTool {
 
                         if (lruCode >= 0) {
                             String oldPattern = reverseCodebook.get(lruCode);
-                            reverseCodebook.remove(lruCode);
+                            // remove old pattern from pattern->code map to keep consistency
+                            if (oldPattern != null) {
+                                codebook.remove(oldPattern);
+                            }
 
                             // Replace with new pattern
-                            codebook.put(new StringBuilder(next), lruCode);
-                            reverseCodebook.put(lruCode, next.toString());
+                            codebook.put(nextStr, lruCode);
+                            reverseCodebook.put(lruCode, nextStr);
                             frequency.put(lruCode, 0);
                             lastUsed.put(lruCode, timestamp);
                         }
@@ -293,11 +300,13 @@ public class LZWTool {
 
                         if (lfuCode >= 0) {
                             String oldPattern = reverseCodebook.get(lfuCode);
-                            reverseCodebook.remove(lfuCode);
+                            if (oldPattern != null) {
+                                codebook.remove(oldPattern);
+                            }
 
                             // Replace with new pattern
-                            codebook.put(new StringBuilder(next), lfuCode);
-                            reverseCodebook.put(lfuCode, next.toString());
+                            codebook.put(nextStr, lfuCode);
+                            reverseCodebook.put(lfuCode, nextStr);
                             frequency.put(lfuCode, 0);
                             lastUsed.put(lfuCode, timestamp);
                         }
@@ -311,7 +320,7 @@ public class LZWTool {
 
         // Output final code
         if (current.length() > 0) {
-            Integer code = codebook.get(current);
+            Integer code = codebook.get(current.toString());
             if (code != null) {
                 BinaryStdOut.write(code, W);
             }
