@@ -7,8 +7,6 @@ import java.util.*;
  */
 public class LZWTool {
 
-    private static boolean DEBUG = false;
-
     public static void main(String[] args) {
         // Parse command-line arguments
         String mode = null;
@@ -33,9 +31,6 @@ public class LZWTool {
                     break;
                 case "--alphabet":
                     alphabetPath = args[++i];
-                    break;
-                case "--debug":
-                    DEBUG = true;
                     break;
                 default:
                     System.err.println("Unknown argument: " + args[i]);
@@ -155,11 +150,6 @@ public class LZWTool {
             info.alphabet.add(String.valueOf(c));
         }
 
-        if (DEBUG) {
-            System.err.println("HEADER: minW=" + info.minW + " maxW=" + info.maxW + " policy=" + info.policy + " alphabetSize=" + alphabetSize);
-            System.err.println("ALPHABET: " + info.alphabet);
-        }
-
         return info;
     }
 
@@ -213,7 +203,6 @@ public class LZWTool {
                     Integer code = codebook.get(current);
                     if (code != null) {
                         BinaryStdOut.write(code, W);
-                        if (DEBUG) System.err.println("COMPRESS: wrote code=" + code + " W=" + W + " (nextCode=" + nextCode + ")");
                         frequency.put(code, frequency.getOrDefault(code, 0) + 1);
                         lastUsed.put(code, timestamp++);
                     }
@@ -224,14 +213,12 @@ public class LZWTool {
                     // Increase width if needed BEFORE adding the new code
                     if (nextCode == (1 << W) && W < maxW) {
                         W++;
-                        if (DEBUG) System.err.println("COMPRESS: increased W to " + W + " before adding code " + nextCode);
                     }
 
                     codebook.put(new StringBuilder(next), nextCode);
                     reverseCodebook.put(nextCode, next.toString());
                     frequency.put(nextCode, 0);
                     lastUsed.put(nextCode, timestamp);
-                    if (DEBUG) System.err.println("COMPRESS: added code=" + nextCode + " => '" + next.toString() + "'");
                     nextCode++;
                 } else {
                     // Codebook full - apply eviction policy
@@ -254,14 +241,12 @@ public class LZWTool {
                         // Add the new pattern
                         if (nextCode == (1 << W) && W < maxW) {
                             W++;
-                            if (DEBUG) System.err.println("COMPRESS: increased W to " + W + " after reset before adding code " + nextCode);
                         }
 
                         codebook.put(new StringBuilder(next), nextCode);
                         reverseCodebook.put(nextCode, next.toString());
                         frequency.put(nextCode, 0);
                         lastUsed.put(nextCode, timestamp);
-                        if (DEBUG) System.err.println("COMPRESS: added code=" + nextCode + " => '" + next.toString() + "' after reset");
                         nextCode++;
                     } else if (policy.equals("lru")) {
                         // Find LRU code (excluding alphabet)
@@ -287,7 +272,6 @@ public class LZWTool {
                             reverseCodebook.put(lruCode, next.toString());
                             frequency.put(lruCode, 0);
                             lastUsed.put(lruCode, timestamp);
-                            if (DEBUG) System.err.println("COMPRESS: replaced LRU code=" + lruCode + " ('" + oldPattern + "') with '" + next.toString() + "'");
                         }
                     } else if (policy.equals("lfu")) {
                         // Find LFU code (excluding alphabet)
@@ -313,7 +297,6 @@ public class LZWTool {
                             reverseCodebook.put(lfuCode, next.toString());
                             frequency.put(lfuCode, 0);
                             lastUsed.put(lfuCode, timestamp);
-                            if (DEBUG) System.err.println("COMPRESS: replaced LFU code=" + lfuCode + " ('" + oldPattern + "') with '" + next.toString() + "'");
                         }
                     }
                     // else freeze - do nothing
@@ -328,14 +311,12 @@ public class LZWTool {
             Integer code = codebook.get(current);
             if (code != null) {
                 BinaryStdOut.write(code, W);
-                if (DEBUG) System.err.println("COMPRESS: wrote final code=" + code + " W=" + W);
             }
         }
 
         // Write stop code (use maximum possible value for current width as EOF marker)
         int stopCode = (1 << W) - 1;
         BinaryStdOut.write(stopCode, W);
-        if (DEBUG) System.err.println("COMPRESS: wrote stopCode=" + stopCode + " W=" + W);
 
         BinaryStdOut.close();
     }
@@ -371,7 +352,6 @@ public class LZWTool {
         // Possibly increase width BEFORE reading first code if initial codebook size reaches the current width capacity
         if (nextCode == (1 << W) && W < info.maxW) {
             W++;
-            if (DEBUG) System.err.println("EXPAND: increased W to " + W + " before first read (nextCode=" + nextCode + ")");
         }
 
         // Read first code
@@ -381,7 +361,6 @@ public class LZWTool {
         }
 
         int prevCode = BinaryStdIn.readInt(W);
-        if (DEBUG) System.err.println("EXPAND: read first code=" + prevCode + " W=" + W + " nextCode=" + nextCode);
         String prevString = codebook.get(prevCode);
 
         if (prevString == null) {
@@ -398,7 +377,6 @@ public class LZWTool {
             // Possibly increase width BEFORE reading the next code so decoder stays in sync with encoder
             if (nextCode == (1 << W) && W < info.maxW) {
                 W++;
-                if (DEBUG) System.err.println("EXPAND: increased W to " + W + " before reading next code (nextCode=" + nextCode + ")");
             }
 
             int code;
@@ -409,12 +387,9 @@ public class LZWTool {
                 break;
             }
 
-            if (DEBUG) System.err.println("EXPAND: read code=" + code + " W=" + W + " nextCode=" + nextCode);
-
             // Check for stop code
             int stopCode = (1 << W) - 1;
             if (code == stopCode) {
-                if (DEBUG) System.err.println("EXPAND: encountered stopCode=" + stopCode + " W=" + W);
                 break;
             }
 
@@ -425,7 +400,6 @@ public class LZWTool {
             } else if (code == nextCode) {
                 // Special case: code not yet in codebook
                 entry = prevString + prevString.charAt(0);
-                if (DEBUG) System.err.println("EXPAND: special-case code==nextCode(" + code + ") -> entry='" + entry + "'");
             } else {
                 throw new RuntimeException("Invalid code: " + code);
             }
@@ -439,12 +413,10 @@ public class LZWTool {
                 // Check if we need to increase width BEFORE adding
                 if (nextCode == (1 << W) && W < info.maxW) {
                     W++;
-                    if (DEBUG) System.err.println("EXPAND: increased W to " + W + " before adding code " + nextCode);
                 }
 
                 String newEntry = prevString + entry.charAt(0);
                 codebook.put(nextCode, newEntry);
-                if (DEBUG) System.err.println("EXPAND: added code=" + nextCode + " => '" + newEntry + "'");
                 frequency.put(nextCode, 0);
                 lastUsed.put(nextCode, timestamp);
                 nextCode++;
@@ -467,14 +439,12 @@ public class LZWTool {
                     // Add the new pattern
                     if (nextCode == (1 << W) && W < info.maxW) {
                         W++;
-                        if (DEBUG) System.err.println("EXPAND: increased W to " + W + " after reset before adding code " + nextCode);
                     }
 
                     String newEntry = prevString + entry.charAt(0);
                     codebook.put(nextCode, newEntry);
                     frequency.put(nextCode, 0);
                     lastUsed.put(nextCode, timestamp);
-                    if (DEBUG) System.err.println("EXPAND: added code=" + nextCode + " => '" + newEntry + "' after reset");
                     nextCode++;
                 } else if (info.policy.equals("lru")) {
                     // Find LRU code (excluding alphabet)
@@ -496,7 +466,6 @@ public class LZWTool {
                         codebook.put(lruCode, newEntry);
                         frequency.put(lruCode, 0);
                         lastUsed.put(lruCode, timestamp);
-                        if (DEBUG) System.err.println("EXPAND: replaced LRU code=" + lruCode + " with '" + newEntry + "'");
                     }
                 } else if (info.policy.equals("lfu")) {
                     // Find LFU code (excluding alphabet)
@@ -518,7 +487,6 @@ public class LZWTool {
                         codebook.put(lfuCode, newEntry);
                         frequency.put(lfuCode, 0);
                         lastUsed.put(lfuCode, timestamp);
-                        if (DEBUG) System.err.println("EXPAND: replaced LFU code=" + lfuCode + " with '" + newEntry + "'");
                     }
                 }
                 // else freeze - do nothing
