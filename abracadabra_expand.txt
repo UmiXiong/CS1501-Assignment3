@@ -1,0 +1,6 @@
+xiongying@xiongyingdeMacBook-Pro-2 cs1501-assignment3-UmiXiong-master % javac *.java
+xiongying@xiongyingdeMacBook-Pro-2 cs1501-assignment3-UmiXiong-master % java LZWTool --mode compress --minW 3 --maxW 4 --policy lru --alphabet alphabets/abracadabra.txt < TestFiles/abracadabra_txt.txt > abracadabra_compress.lzw 2> compress.log
+xiongying@xiongyingdeMacBook-Pro-2 cs1501-assignment3-UmiXiong-master % java LZWTool --mode expand < abracadabra_compress.lzw > abracadabra_expand.txt 2> expand.log
+xiongying@xiongyingdeMacBook-Pro-2 cs1501-assignment3-UmiXiong-master % diff TestFiles/abracadabra_txt.txt abracadabra_expand.txt
+1d0
+< abraabraabraabracadabraabraabra

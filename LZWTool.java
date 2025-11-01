@@ -1,138 +1,195 @@
-/*
- Diagnostic LZWTool - prints a numbered eviction (evict) snapshot on every replacement so encoder/decoder logs can be compared.
- Replace your project's LZWTool.java with this file for one diagnostic run.
- Keep TSTmod.java and BinaryStdIn/BinaryStdOut unchanged.
- Usage:
-   javac *.java
-   java LZWTool --mode compress --minW 3 --maxW 4 --policy lru --alphabet alphabets/ab.txt < TestFiles/ab_txt.txt > ab_compress.lzw 2> compress.log
-   java LZWTool --mode expand < ab_compress.lzw > ab_expand.txt 2> expand.log
-*/
 import java.io.*;
 import java.util.*;
 
+/**
+ * LZWTool - A configurable LZW compression and decompression tool
+ * Supports variable codeword width, custom alphabets, and multiple eviction policies
+ */
 public class LZWTool {
 
-    private static final boolean DEBUG = false; // general debug
-    // Eviction counter shared per run (encoder and decoder runs are separate processes)
-    private static int evictCounter = 0;
-
     public static void main(String[] args) {
+        // Parse command-line arguments
         String mode = null;
-        int minW = 9, maxW = 16;
+        int minW = 9;
+        int maxW = 16;
         String policy = "freeze";
         String alphabetPath = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
-                case "--mode": mode = args[++i]; break;
-                case "--minW": minW = Integer.parseInt(args[++i]); break;
-                case "--maxW": maxW = Integer.parseInt(args[++i]); break;
-                case "--policy": policy = args[++i]; break;
-                case "--alphabet": alphabetPath = args[++i]; break;
+                case "--mode":
+                    mode = args[++i];
+                    break;
+                case "--minW":
+                    minW = Integer.parseInt(args[++i]);
+                    break;
+                case "--maxW":
+                    maxW = Integer.parseInt(args[++i]);
+                    break;
+                case "--policy":
+                    policy = args[++i];
+                    break;
+                case "--alphabet":
+                    alphabetPath = args[++i];
+                    break;
                 default:
                     System.err.println("Unknown argument: " + args[i]);
                     System.exit(2);
             }
         }
 
-        if (mode == null) { System.err.println("Error: --mode is required"); System.exit(1); }
-        if (minW > maxW) { System.err.println("Error: minW must be <= maxW"); System.exit(1); }
+        // Validate arguments
+        if (mode == null) {
+            System.err.println("Error: --mode is required");
+            System.exit(1);
+        }
 
+        if (minW > maxW) {
+            System.err.println("Error: minW must be <= maxW");
+            System.exit(1);
+        }
+
+        // Execute compression or expansion
         try {
-            if ("compress".equals(mode)) {
-                if (alphabetPath == null) { System.err.println("Error: --alphabet required for compress"); System.exit(1); }
+            if (mode.equals("compress")) {
+                if (alphabetPath == null) {
+                    System.err.println("Error: --alphabet is required for compression");
+                    System.exit(1);
+                }
                 compress(minW, maxW, policy, alphabetPath);
-            } else if ("expand".equals(mode)) {
+            } else if (mode.equals("expand")) {
                 expand();
             } else {
-                System.err.println("Error: unknown mode " + mode); System.exit(1);
+                System.err.println("Error: mode must be 'compress' or 'expand'");
+                System.exit(1);
             }
         } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
             System.exit(1);
         }
     }
 
-    // Read alphabet file: one symbol per line (non-empty), deduplicate preserving order
+    /**
+     * Read alphabet from file
+     */
     private static List<String> readAlphabet(String path) throws IOException {
         List<String> alphabet = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
             String line;
-            while ((line = br.readLine()) != null) {
+            while ((line = reader.readLine()) != null) {
                 if (!line.isEmpty() && !seen.contains(line)) {
                     seen.add(line);
                     alphabet.add(line);
                 }
             }
         }
+
         return alphabet;
     }
 
+    /**
+     * Write header to compressed file
+     */
     private static void writeHeader(int minW, int maxW, String policy, List<String> alphabet) {
+        // Write minW (1 byte)
         BinaryStdOut.write(minW, 8);
+
+        // Write maxW (1 byte)
         BinaryStdOut.write(maxW, 8);
+
+        // Write policy as integer (1 byte)
         int policyCode = 0;
-        switch (policy) { case "freeze": policyCode = 0; break; case "reset": policyCode = 1; break; case "lru": policyCode = 2; break; case "lfu": policyCode = 3; break; }
+        switch (policy) {
+            case "freeze": policyCode = 0; break;
+            case "reset": policyCode = 1; break;
+            case "lru": policyCode = 2; break;
+            case "lfu": policyCode = 3; break;
+        }
         BinaryStdOut.write(policyCode, 8);
+
+        // Write alphabet size (2 bytes)
         BinaryStdOut.write(alphabet.size(), 16);
-        for (String s : alphabet) BinaryStdOut.write(s.charAt(0), 8);
+
+        // Write each alphabet symbol (1 byte per symbol)
+        for (String symbol : alphabet) {
+            BinaryStdOut.write(symbol.charAt(0), 8);
+        }
     }
 
+    /**
+     * Read header from compressed file
+     */
     private static HeaderInfo readHeader() {
-        HeaderInfo h = new HeaderInfo();
-        h.minW = BinaryStdIn.readInt(8);
-        h.maxW = BinaryStdIn.readInt(8);
-        int pc = BinaryStdIn.readInt(8);
-        switch (pc) { case 0: h.policy = "freeze"; break; case 1: h.policy = "reset"; break; case 2: h.policy = "lru"; break; case 3: h.policy = "lfu"; break; default: h.policy = "freeze"; break; }
+        HeaderInfo info = new HeaderInfo();
+
+        // Read minW
+        info.minW = BinaryStdIn.readInt(8);
+
+        // Read maxW
+        info.maxW = BinaryStdIn.readInt(8);
+
+        // Read policy
+        int policyCode = BinaryStdIn.readInt(8);
+        switch (policyCode) {
+            case 0: info.policy = "freeze"; break;
+            case 1: info.policy = "reset"; break;
+            case 2: info.policy = "lru"; break;
+            case 3: info.policy = "lfu"; break;
+        }
+
+        // Read alphabet size
         int alphabetSize = BinaryStdIn.readInt(16);
-        h.alphabet = new ArrayList<>();
-        for (int i = 0; i < alphabetSize; i++) h.alphabet.add(String.valueOf(BinaryStdIn.readChar(8)));
-        return h;
-    }
 
-    // Print small neighbor snapshot for reverse/codebook
-    private static void printNeighbors(Map<Integer,String> map, int center, int alphabetSize, String tag) {
-        int lo = Math.max(alphabetSize, center - 4);
-        int hi = Math.min(center + 5, Math.max(center+1, lo + 9));
-        System.err.println(tag + " neighbors [" + lo + ".." + (hi-1) + "]:");
-        for (int i = lo; i < hi; i++) {
-            String v = map.get(i);
-            System.err.printf("  %d -> \"%s\"%n", i, v == null ? "null" : v);
+        // Read alphabet
+        info.alphabet = new ArrayList<>();
+        for (int i = 0; i < alphabetSize; i++) {
+            char c = BinaryStdIn.readChar(8);
+            info.alphabet.add(String.valueOf(c));
         }
+
+        return info;
     }
 
-    // Complete reverse snapshot for a small range (used for first few evicts if needed)
-    private static void printRange(Map<Integer,String> map, int lo, int hi, String tag) {
-        System.err.println(tag + " [" + lo + ".." + (hi-1) + "]:");
-        for (int i = lo; i < hi; i++) {
-            String v = map.get(i);
-            System.err.printf("  %d -> \"%s\"%n", i, v == null ? "null" : v);
-        }
-    }
-
-    // Compressor diagnostic version: print evict info and evictCounter
+    /**
+     * Compress input using LZW algorithm
+     */
     private static void compress(int minW, int maxW, String policy, String alphabetPath) throws IOException {
+        // Read alphabet from file
         List<String> alphabet = readAlphabet(alphabetPath);
+
+        // Write header
         writeHeader(minW, maxW, policy, alphabet);
 
+        // Initialize compression state
         int W = minW;
-        int maxCodeLimit = (1 << maxW) - 1;
+        int maxCodeLimit = (1 << maxW);
 
+        // Build initial codebook
         TSTmod<Integer> codebook = new TSTmod<>();
-        Map<Integer,String> reverse = new HashMap<>();
+        Map<Integer, String> reverseCodebook = new HashMap<>();
         int nextCode = 0;
-        for (String s : alphabet) { codebook.put(new StringBuilder(s), nextCode); reverse.put(nextCode, s); nextCode++; }
 
-        Map<Integer,Integer> frequency = new HashMap<>();
-        Map<Integer,Integer> lastUsed = new HashMap<>();
-        for (int i = 0; i < alphabet.size(); i++) { frequency.put(i,0); lastUsed.put(i,0); }
+        for (String symbol : alphabet) {
+            codebook.put(new StringBuilder(symbol), nextCode);
+            reverseCodebook.put(nextCode, symbol);
+            nextCode++;
+        }
+
+        // Tracking for eviction policies
+        Map<Integer, Integer> frequency = new HashMap<>();
+        Map<Integer, Integer> lastUsed = new HashMap<>();
         int timestamp = 0;
 
-        System.err.printf("ENCODE: start minW=%d maxW=%d policy=%s alpha=%d maxLimit=%d%n", minW, maxW, policy, alphabet.size(), maxCodeLimit);
+        for (int i = 0; i < alphabet.size(); i++) {
+            frequency.put(i, 0);
+            lastUsed.put(i, 0);
+        }
 
+        // Process input
         StringBuilder current = new StringBuilder();
-        String prevString = null; // last output string, kept for symmetric new pattern construction
 
         while (!BinaryStdIn.isEmpty()) {
             char c = BinaryStdIn.readChar(8);
@@ -141,244 +198,288 @@ public class LZWTool {
             if (codebook.contains(next)) {
                 current = next;
             } else {
+                // Output code for current
                 if (current.length() > 0) {
                     Integer code = codebook.get(current);
                     if (code != null) {
                         BinaryStdOut.write(code, W);
-                        frequency.put(code, frequency.getOrDefault(code,0)+1);
-                        lastUsed.put(code, ++timestamp);
-                        System.err.printf("ENCODE: wrote code=%d W=%d nextCode=%d ts=%d current=\"%s\"%n", code, W, nextCode, timestamp, current.toString());
-                        prevString = reverse.get(code);
+                        frequency.put(code, frequency.getOrDefault(code, 0) + 1);
+                        lastUsed.put(code, timestamp++);
                     }
                 }
 
-                // new pattern to add/replace: use prevString + c to mirror decoder behavior
-                String newPattern = (prevString != null) ? prevString + c : next.toString();
-
+                // Try to add new pattern
                 if (nextCode < maxCodeLimit) {
-                    if (nextCode == (1<<W)-1 && W < maxW) {
-                        System.err.printf("ENCODE: bump width %d -> %d (nextCode=%d)%n", W, W+1, nextCode);
+                    // Increase width if needed BEFORE adding the new code
+                    if (nextCode == (1 << W) && W < maxW) {
                         W++;
                     }
-                    codebook.put(new StringBuilder(newPattern), nextCode);
-                    reverse.put(nextCode, newPattern);
+
+                    codebook.put(new StringBuilder(next), nextCode);
+                    reverseCodebook.put(nextCode, next.toString());
                     frequency.put(nextCode, 0);
-                    System.err.printf("ENCODE: add code=%d => \"%s\"%n", nextCode, newPattern);
+                    lastUsed.put(nextCode, timestamp);
                     nextCode++;
                 } else {
-                    // need to evict/replace according to policy
-                    if ("lru".equals(policy)) {
-                        int lru=-1, minTime=Integer.MAX_VALUE;
-                        for (int i = alphabet.size(); i < nextCode; i++) {
-                            if (reverse.containsKey(i)) {
-                                int t = lastUsed.getOrDefault(i, 0);
-                                if (t < minTime || (t == minTime && (lru == -1 || i < lru))) { minTime = t; lru = i; }
-                            }
-                        }
-                        if (lru >= 0) {
-                            evictCounter++;
-                            // print snapshot BEFORE evict with evict id
-                            System.err.printf("ENC_EVICT#%d BEFORE chosen=%d minTime=%d ts=%d prevString=\"%s\" newPattern=\"%s\"%n",
-                                    evictCounter, lru, minTime, timestamp, prevString, newPattern);
-                            printNeighbors(reverse, lru, alphabet.size(), "ENC_EVICT#" + evictCounter);
-
-                            String old = reverse.get(lru);
-                            reverse.remove(lru);
-                            if (old != null) codebook.put(new StringBuilder(old), null);
-                            codebook.put(new StringBuilder(newPattern), lru);
-                            reverse.put(lru, newPattern);
-                            frequency.put(lru, 0);
-
-                            // print AFTER snapshot
-                            System.err.printf("ENC_EVICT#%d AFTER chosen=%d old=\"%s\" -> new=\"%s\"%n",
-                                    evictCounter, lru, old, newPattern);
-                            printNeighbors(reverse, lru, alphabet.size(), "ENC_EVICT#" + evictCounter);
-                        } else {
-                            System.err.println("ENCODE: LRU found no candidate");
-                        }
-                    } else if ("lfu".equals(policy)) {
-                        int lfu=-1, minFreq=Integer.MAX_VALUE;
-                        for (int i = alphabet.size(); i < nextCode; i++) {
-                            if (reverse.containsKey(i)) {
-                                int f = frequency.getOrDefault(i, 0);
-                                if (f < minFreq || (f == minFreq && (lfu == -1 || i < lfu))) { minFreq = f; lfu = i; }
-                            }
-                        }
-                        if (lfu >= 0) {
-                            evictCounter++;
-                            System.err.printf("ENC_EVICT#%d BEFORE chosen=%d minFreq=%d ts=%d prevString=\"%s\" newPattern=\"%s\"%n",
-                                    evictCounter, lfu, minFreq, timestamp, prevString, newPattern);
-                            printNeighbors(reverse, lfu, alphabet.size(), "ENC_EVICT#" + evictCounter);
-
-                            String old = reverse.get(lfu);
-                            reverse.remove(lfu);
-                            if (old != null) codebook.put(new StringBuilder(old), null);
-                            codebook.put(new StringBuilder(newPattern), lfu);
-                            reverse.put(lfu, newPattern);
-                            frequency.put(lfu, 0);
-
-                            System.err.printf("ENC_EVICT#%d AFTER chosen=%d old=\"%s\" -> new=\"%s\"%n",
-                                    evictCounter, lfu, old, newPattern);
-                            printNeighbors(reverse, lfu, alphabet.size(), "ENC_EVICT#" + evictCounter);
-                        } else {
-                            System.err.println("ENCODE: LFU found no candidate");
-                        }
-                    } else if ("reset".equals(policy)) {
-                        // reset: print reset event (evictCounter not incremented)
-                        System.err.printf("ENCODE: RESET at ts=%d%n", timestamp);
+                    // Codebook full - apply eviction policy
+                    if (policy.equals("reset")) {
+                        // Reset to alphabet only
                         codebook = new TSTmod<>();
-                        reverse.clear();
-                        frequency.clear();
-                        lastUsed.clear();
+                        reverseCodebook.clear();
                         nextCode = 0;
-                        for (String s : alphabet) { codebook.put(new StringBuilder(s), nextCode); reverse.put(nextCode, s); frequency.put(nextCode,0); lastUsed.put(nextCode,0); nextCode++; }
-                        W = minW;
-                        if (nextCode == (1<<W)-1 && W < maxW) W++;
-                        if (nextCode < maxCodeLimit) {
-                            codebook.put(new StringBuilder(newPattern), nextCode);
-                            reverse.put(nextCode, newPattern);
-                            frequency.put(nextCode,0);
+
+                        for (String symbol : alphabet) {
+                            codebook.put(new StringBuilder(symbol), nextCode);
+                            reverseCodebook.put(nextCode, symbol);
+                            frequency.put(nextCode, 0);
+                            lastUsed.put(nextCode, timestamp);
                             nextCode++;
                         }
-                    } else {
-                        System.err.println("ENCODE: freeze policy - not adding");
+
+                        W = minW;
+
+                        // Add the new pattern
+                        if (nextCode == (1 << W) && W < maxW) {
+                            W++;
+                        }
+
+                        codebook.put(new StringBuilder(next), nextCode);
+                        reverseCodebook.put(nextCode, next.toString());
+                        frequency.put(nextCode, 0);
+                        lastUsed.put(nextCode, timestamp);
+                        nextCode++;
+                    } else if (policy.equals("lru")) {
+                        // Find LRU code (excluding alphabet)
+                        int lruCode = -1;
+                        int minTime = Integer.MAX_VALUE;
+
+                        for (int i = alphabet.size(); i < nextCode; i++) {
+                            if (reverseCodebook.containsKey(i)) {
+                                int time = lastUsed.getOrDefault(i, 0);
+                                if (time < minTime) {
+                                    minTime = time;
+                                    lruCode = i;
+                                }
+                            }
+                        }
+
+                        if (lruCode >= 0) {
+                            String oldPattern = reverseCodebook.get(lruCode);
+                            reverseCodebook.remove(lruCode);
+
+                            // Replace with new pattern
+                            codebook.put(new StringBuilder(next), lruCode);
+                            reverseCodebook.put(lruCode, next.toString());
+                            frequency.put(lruCode, 0);
+                            lastUsed.put(lruCode, timestamp);
+                        }
+                    } else if (policy.equals("lfu")) {
+                        // Find LFU code (excluding alphabet)
+                        int lfuCode = -1;
+                        int minFreq = Integer.MAX_VALUE;
+
+                        for (int i = alphabet.size(); i < nextCode; i++) {
+                            if (reverseCodebook.containsKey(i)) {
+                                int freq = frequency.getOrDefault(i, 0);
+                                if (freq < minFreq) {
+                                    minFreq = freq;
+                                    lfuCode = i;
+                                }
+                            }
+                        }
+
+                        if (lfuCode >= 0) {
+                            String oldPattern = reverseCodebook.get(lfuCode);
+                            reverseCodebook.remove(lfuCode);
+
+                            // Replace with new pattern
+                            codebook.put(new StringBuilder(next), lfuCode);
+                            reverseCodebook.put(lfuCode, next.toString());
+                            frequency.put(lfuCode, 0);
+                            lastUsed.put(lfuCode, timestamp);
+                        }
                     }
+                    // else freeze - do nothing
                 }
 
                 current = new StringBuilder().append(c);
             }
         }
 
+        // Output final code
         if (current.length() > 0) {
             Integer code = codebook.get(current);
             if (code != null) {
                 BinaryStdOut.write(code, W);
-                System.err.printf("ENCODE: final write code=%d current=\"%s\"%n", code, current.toString());
             }
         }
 
-        int stop = (1<<W) - 1;
-        BinaryStdOut.write(stop, W);
-        System.err.println("ENCODE: wrote STOP=" + stop);
+        // Write stop code (use maximum possible value for current width as EOF marker)
+        int stopCode = (1 << W) - 1;
+        BinaryStdOut.write(stopCode, W);
+
         BinaryStdOut.close();
-        System.err.println("ENCODE: finished");
     }
 
-    // Decoder diagnostic version: prints evict info and evictCounter (separate process)
+    /**
+     * Expand compressed input
+     */
     private static void expand() throws IOException {
+        // Read header
         HeaderInfo info = readHeader();
+
         int W = info.minW;
-        int maxCodeLimit = (1 << info.maxW) - 1;
+        int maxCodeLimit = (1 << info.maxW);
 
-        Map<Integer,String> codebook = new HashMap<>();
+        // Build initial codebook
+        Map<Integer, String> codebook = new HashMap<>();
         int nextCode = 0;
-        for (String s : info.alphabet) codebook.put(nextCode++, s);
 
-        Map<Integer,Integer> frequency = new HashMap<>();
-        Map<Integer,Integer> lastUsed = new HashMap<>();
-        for (int i = 0; i < info.alphabet.size(); i++) { frequency.put(i,0); lastUsed.put(i,0); }
+        for (String symbol : info.alphabet) {
+            codebook.put(nextCode++, symbol);
+        }
+
+        // Tracking for eviction policies
+        Map<Integer, Integer> frequency = new HashMap<>();
+        Map<Integer, Integer> lastUsed = new HashMap<>();
         int timestamp = 0;
 
-        System.err.printf("DECODE: start minW=%d maxW=%d policy=%s alpha=%d maxLimit=%d%n",
-                info.minW, info.maxW, info.policy, info.alphabet.size(), maxCodeLimit);
+        for (int i = 0; i < info.alphabet.size(); i++) {
+            frequency.put(i, 0);
+            lastUsed.put(i, 0);
+        }
 
-        if (nextCode == (1<<W)-1 && W < info.maxW) W++;
-        if (BinaryStdIn.isEmpty()) { BinaryStdOut.close(); return; }
+        // Read first code
+        if (BinaryStdIn.isEmpty()) {
+            BinaryStdOut.close();
+            return;
+        }
 
         int prevCode = BinaryStdIn.readInt(W);
-        System.err.printf("DECODE: read first code=%d W=%d nextCode=%d%n", prevCode, W, nextCode);
         String prevString = codebook.get(prevCode);
-        if (prevString == null) { BinaryStdOut.close(); return; }
-        BinaryStdOut.write(prevString);
-        frequency.put(prevCode, frequency.getOrDefault(prevCode,0) + 1);
-        lastUsed.put(prevCode, ++timestamp);
 
+        if (prevString == null) {
+            BinaryStdOut.close();
+            return;
+        }
+
+        BinaryStdOut.write(prevString);
+        frequency.put(prevCode, frequency.getOrDefault(prevCode, 0) + 1);
+        lastUsed.put(prevCode, timestamp++);
+
+        // Process remaining codes
         while (!BinaryStdIn.isEmpty()) {
-            if (nextCode == (1<<W)-1 && W < info.maxW) W++;
-            int code = BinaryStdIn.readInt(W);
-            System.err.printf("DECODE: read code=%d W=%d nextCode=%d%n", code, W, nextCode);
-            int stop = (1<<W)-1;
-            if (code == stop) { System.err.printf("DECODE: hit STOP=%d%n", stop); break; }
+            int code;
+            try {
+                code = BinaryStdIn.readInt(W);
+            } catch (NoSuchElementException e) {
+                // End of stream reached
+                break;
+            }
+
+            // Check for stop code
+            int stopCode = (1 << W) - 1;
+            if (code == stopCode) {
+                break;
+            }
 
             String entry;
-            if (codebook.containsKey(code)) entry = codebook.get(code);
-            else if (code == nextCode) entry = prevString + prevString.charAt(0);
-            else throw new RuntimeException("Invalid code: " + code);
+
+            if (codebook.containsKey(code)) {
+                entry = codebook.get(code);
+            } else if (code == nextCode) {
+                // Special case: code not yet in codebook
+                entry = prevString + prevString.charAt(0);
+            } else {
+                throw new RuntimeException("Invalid code: " + code);
+            }
 
             BinaryStdOut.write(entry);
-            frequency.put(code, frequency.getOrDefault(code,0) + 1);
-            lastUsed.put(code, ++timestamp);
+            frequency.put(code, frequency.getOrDefault(code, 0) + 1);
+            lastUsed.put(code, timestamp++);
 
+            // Add new entry to codebook
             if (nextCode < maxCodeLimit) {
-                if (nextCode == (1<<W)-1 && W < info.maxW) W++;
+                // Check if we need to increase width BEFORE adding
+                if (nextCode == (1 << W) && W < info.maxW) {
+                    W++;
+                }
+
                 String newEntry = prevString + entry.charAt(0);
                 codebook.put(nextCode, newEntry);
                 frequency.put(nextCode, 0);
-                System.err.printf("DECODE: add code=%d => \"%s\"%n", nextCode, newEntry);
+                lastUsed.put(nextCode, timestamp);
                 nextCode++;
             } else {
-                if ("lru".equals(info.policy)) {
-                    int lru=-1, minTime=Integer.MAX_VALUE;
-                    for (int i = info.alphabet.size(); i < nextCode; i++) {
-                        if (codebook.containsKey(i)) {
-                            int t = lastUsed.getOrDefault(i,0);
-                            if (t < minTime || (t == minTime && (lru == -1 || i < lru))) { minTime = t; lru = i; }
-                        }
-                    }
-                    if (lru >= 0) {
-                        evictCounter++;
-                        String newEntry = prevString + entry.charAt(0);
-                        System.err.printf("DEC_EVICT#%d BEFORE chosen=%d minTime=%d ts=%d prevString=\"%s\" entry=\"%s\" newEntry=\"%s\"%n",
-                                evictCounter, lru, minTime, timestamp, prevString, entry, newEntry);
-                        printNeighbors(codebook, lru, info.alphabet.size(), "DEC_EVICT#" + evictCounter);
-
-                        codebook.put(lru, newEntry);
-                        frequency.put(lru, 0);
-
-                        System.err.printf("DEC_EVICT#%d AFTER chosen=%d new=\"%s\"%n", evictCounter, lru, newEntry);
-                        printNeighbors(codebook, lru, info.alphabet.size(), "DEC_EVICT#" + evictCounter);
-                    } else {
-                        System.err.println("DECODE: LRU found no candidate");
-                    }
-                } else if ("lfu".equals(info.policy)) {
-                    int lfu=-1, minFreq=Integer.MAX_VALUE;
-                    for (int i = info.alphabet.size(); i < nextCode; i++) {
-                        if (codebook.containsKey(i)) {
-                            int f = frequency.getOrDefault(i,0);
-                            if (f < minFreq || (f == minFreq && (lfu == -1 || i < lfu))) { minFreq = f; lfu = i; }
-                        }
-                    }
-                    if (lfu >= 0) {
-                        evictCounter++;
-                        String newEntry = prevString + entry.charAt(0);
-                        System.err.printf("DEC_EVICT#%d BEFORE chosen=%d minFreq=%d ts=%d prevString=\"%s\" entry=\"%s\" newEntry=\"%s\"%n",
-                                evictCounter, lfu, minFreq, timestamp, prevString, entry, newEntry);
-                        printNeighbors(codebook, lfu, info.alphabet.size(), "DEC_EVICT#" + evictCounter);
-
-                        codebook.put(lfu, newEntry);
-                        frequency.put(lfu, 0);
-
-                        System.err.printf("DEC_EVICT#%d AFTER chosen=%d new=\"%s\"%n", evictCounter, lfu, newEntry);
-                        printNeighbors(codebook, lfu, info.alphabet.size(), "DEC_EVICT#" + evictCounter);
-                    } else {
-                        System.err.println("DECODE: LFU found no candidate");
-                    }
-                } else if ("reset".equals(info.policy)) {
-                    System.err.printf("DECODE: RESET at ts=%d%n", timestamp);
+                // Codebook full - apply eviction policy
+                if (info.policy.equals("reset")) {
+                    // Reset to alphabet only
                     codebook.clear();
                     nextCode = 0;
-                    for (String s : info.alphabet) { codebook.put(nextCode, s); frequency.put(nextCode,0); lastUsed.put(nextCode,0); nextCode++; }
-                    W = info.minW;
-                    if (nextCode == (1<<W)-1 && W < info.maxW) W++;
-                    if (nextCode < maxCodeLimit) {
-                        String newEntry = prevString + entry.charAt(0);
-                        codebook.put(nextCode, newEntry);
-                        frequency.put(nextCode,0);
+
+                    for (String symbol : info.alphabet) {
+                        codebook.put(nextCode, symbol);
+                        frequency.put(nextCode, 0);
+                        lastUsed.put(nextCode, timestamp);
                         nextCode++;
                     }
-                } else {
-                    System.err.println("DECODE: freeze policy - not adding");
+
+                    W = info.minW;
+
+                    // Add the new pattern
+                    if (nextCode == (1 << W) && W < info.maxW) {
+                        W++;
+                    }
+
+                    String newEntry = prevString + entry.charAt(0);
+                    codebook.put(nextCode, newEntry);
+                    frequency.put(nextCode, 0);
+                    lastUsed.put(nextCode, timestamp);
+                    nextCode++;
+                } else if (info.policy.equals("lru")) {
+                    // Find LRU code (excluding alphabet)
+                    int lruCode = -1;
+                    int minTime = Integer.MAX_VALUE;
+
+                    for (int i = info.alphabet.size(); i < nextCode; i++) {
+                        if (codebook.containsKey(i)) {
+                            int time = lastUsed.getOrDefault(i, 0);
+                            if (time < minTime) {
+                                minTime = time;
+                                lruCode = i;
+                            }
+                        }
+                    }
+
+                    if (lruCode >= 0) {
+                        String newEntry = prevString + entry.charAt(0);
+                        codebook.put(lruCode, newEntry);
+                        frequency.put(lruCode, 0);
+                        lastUsed.put(lruCode, timestamp);
+                    }
+                } else if (info.policy.equals("lfu")) {
+                    // Find LFU code (excluding alphabet)
+                    int lfuCode = -1;
+                    int minFreq = Integer.MAX_VALUE;
+
+                    for (int i = info.alphabet.size(); i < nextCode; i++) {
+                        if (codebook.containsKey(i)) {
+                            int freq = frequency.getOrDefault(i, 0);
+                            if (freq < minFreq) {
+                                minFreq = freq;
+                                lfuCode = i;
+                            }
+                        }
+                    }
+
+                    if (lfuCode >= 0) {
+                        String newEntry = prevString + entry.charAt(0);
+                        codebook.put(lfuCode, newEntry);
+                        frequency.put(lfuCode, 0);
+                        lastUsed.put(lfuCode, timestamp);
+                    }
                 }
+                // else freeze - do nothing
             }
 
             prevString = entry;
@@ -386,8 +487,15 @@ public class LZWTool {
         }
 
         BinaryStdOut.close();
-        System.err.println("DECODE: finished");
     }
 
-    private static class HeaderInfo { int minW, maxW; String policy; List<String> alphabet; }
+    /**
+     * Helper class to store header information
+     */
+    private static class HeaderInfo {
+        int minW;
+        int maxW;
+        String policy;
+        List<String> alphabet;
+    }
 }
