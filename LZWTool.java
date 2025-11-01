@@ -9,17 +9,17 @@ public class LZWTool
 {
 
     //    private static boolean DEBUG = false;
-    private static void printCodebook(Map<?, ?> codebook, String name) {
-        System.err.println("\n===== " + name + " Codebook Contents =====");
-        if (codebook.isEmpty()) {
-            System.err.println("Codebook is empty");
-            return;
-        }
-        for (Map.Entry<?, ?> entry : codebook.entrySet()) {
-            System.err.printf("Key: %-5s Value: %s%n", entry.getKey(), entry.getValue());
-        }
-        System.err.println("=============================\n");
-    }
+//    private static void printCodebook(Map<?, ?> codebook, String name) {
+//        System.err.println("\n===== " + name + " Codebook Contents =====");
+//        if (codebook.isEmpty()) {
+//            System.err.println("Codebook is empty");
+//            return;
+//        }
+//        for (Map.Entry<?, ?> entry : codebook.entrySet()) {
+//            System.err.printf("Key: %-5s Value: %s%n", entry.getKey(), entry.getValue());
+//        }
+//        System.err.println("=============================\n");
+//    }
     public static void main(String[] args)
     {
         // Parse command-line arguments
@@ -30,14 +30,13 @@ public class LZWTool
 //        String mode ="expand";
 //        String inputFile ="TestFiles/test2_output.lzw";
 //        String outputFile ="TestFiles/test2_back.txt";
-////
-////        String alphabetPath = "alphabets/tobeornot.txt";
-//        String alphabetPath="alphabets/ab.txt";
+
+//        String alphabetPath = "alphabets/abrcd.txt";
 
         String mode=null;
         int minW = 3;
         int maxW = 4;
-        String policy = "freeze";
+        String policy = "reset";
         String alphabetPath=null;
 
         for (int i = 0; i < args.length; i++)
@@ -79,8 +78,8 @@ public class LZWTool
         }
 
 
-        InputStream originalIn = System.in;
-        PrintStream originalOut = System.out;
+//        InputStream originalIn = System.in;
+//        PrintStream originalOut = System.out;
 
         // Execute compression or expansion
         try
@@ -125,18 +124,18 @@ public class LZWTool
             e.printStackTrace();
             System.exit(1);
         }
-        finally
-        {
-            // 4. 恢复原始的输入流和输出流（避免影响后续操作）
-            try {
-                System.in.close(); // 关闭文件输入流
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            System.out.close(); // 关闭文件输出流
+//        finally
+//        {
+//            // 4. 恢复原始的输入流和输出流（避免影响后续操作）
+//            try {
+//                System.in.close(); // 关闭文件输入流
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//            System.out.close(); // 关闭文件输出流
 //            System.setIn(originalIn); // 恢复控制台输入
 //            System.setOut(originalOut); // 恢复控制台输出
-        }
+//        }
     }
 
     /**
@@ -276,7 +275,7 @@ public class LZWTool
         }
 
         // 打印初始Codebook
-        printCodebook(reverseCodebook, "初始化时");
+//        printCodebook(reverseCodebook, "初始化时");
 
         // Tracking for eviction policies
         Map<Integer, Integer> frequency = new HashMap<>();
@@ -340,7 +339,7 @@ public class LZWTool
                     nextCode++;
 
                     // 打印更新后的Codebook
-                    printCodebook(reverseCodebook, "添加新码表后");
+//                    printCodebook(reverseCodebook, "添加新码表后");
                 }
                 else
                 {
@@ -377,7 +376,7 @@ public class LZWTool
                         lastUsed.put(nextCode, timestamp);
                         nextCode++;
 
-                        printCodebook(reverseCodebook, "reset码表后");
+//                        printCodebook(reverseCodebook, "reset码表后");
                     }
                     else if (policy.equals("lru"))
                     {
@@ -413,7 +412,7 @@ public class LZWTool
                             frequency.put(lruCode, 0);
                             lastUsed.put(lruCode, timestamp);
                         }
-                        printCodebook(reverseCodebook, "lru更新码表后");
+//                        printCodebook(reverseCodebook, "lru更新码表后");
                     }
                     else if (policy.equals("lfu"))
                     {
@@ -448,7 +447,7 @@ public class LZWTool
                             frequency.put(lfuCode, 0);
                             lastUsed.put(lfuCode, timestamp);
                         }
-                        printCodebook(reverseCodebook, "lfu更新码表后");
+//                        printCodebook(reverseCodebook, "lfu更新码表后");
                     }
                     // else freeze - do nothing
                 }
@@ -495,7 +494,7 @@ public class LZWTool
             codebook.put(nextCode++, symbol);
         }
         // 打印初始Codebook
-        printCodebook(codebook, "初始化时");
+//        printCodebook(codebook, "初始化时");
 
         // Tracking for eviction policies
         Map<Integer, Integer> frequency = new HashMap<>();
@@ -541,12 +540,9 @@ public class LZWTool
         frequency.put(prevCode, frequency.getOrDefault(prevCode, 0) + 1);
         lastUsed.put(prevCode, timestamp++);
 
-        String entry=prevString;
-
         // Process remaining codes
         while (!BinaryStdIn.isEmpty())
         {
-
             // Possibly increase width BEFORE reading the next code so decoder stays in sync with encoder
             if (nextCode == (1 << W) && W < info.maxW)
             {
@@ -578,17 +574,16 @@ public class LZWTool
                 break;
             }
             sbCode.append(code);
-
             System.err.println("编码:"+sbCode);
 
             // Check for stop code
-            int stopCode = (1 << W)-1;
+            int stopCode = (1 << W) - 1;
             if (code == stopCode)
             {
                 break;
             }
 
-
+            String entry;
 
             if (codebook.containsKey(code))
             {
@@ -624,7 +619,7 @@ public class LZWTool
                 frequency.put(nextCode, 0);
                 lastUsed.put(nextCode, timestamp);
                 nextCode++;
-                printCodebook(codebook, "添加新码表后");
+//                printCodebook(codebook, "添加新码表后");
             }
             else
             {
@@ -717,45 +712,9 @@ public class LZWTool
             prevString = entry;
             prevCode = code;
         }
-        if (info.policy.equals("freeze"))
-        {
-            while (!BinaryStdIn.isEmpty()){
-                int code=-1;
-                try
-                {
-                    code = BinaryStdIn.readInt(W);
-                }catch (NoSuchElementException e)
-                {
-                    // End of stream reached
-                    break;
-                }
-                sbCode.append(code);
-                System.err.println("编码:"+sbCode);
-                if (codebook.containsKey(code))
-                {
-                    entry = codebook.get(code);
-                }
-                else if (code == nextCode)
-                {
-                    // Special case: code not yet in codebook
-                    entry = prevString + prevString.charAt(0);
-                }
-                else
-                {
-                    throw new RuntimeException("Invalid code: " + code);
-                }
-                sbContent.append(entry);
-                System.err.println("内容:"+sbContent);
-
-                BinaryStdOut.write(entry);
-                frequency.put(code, frequency.getOrDefault(code, 0) + 1);
-                lastUsed.put(code, timestamp++);
-            }
-            System.err.println("字典固定");
+        if(info.policy.equals("freeze")){
+            System.err.println("艹");
         }
-
-        String s = codebook.get(1<<W-1);
-        sbContent.delete(sbContent.length()-s.length(),sbContent.length());
 
         BinaryStdOut.close();
     }
