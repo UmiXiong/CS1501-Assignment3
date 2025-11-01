@@ -132,8 +132,8 @@ public class LZWTool
                 e.printStackTrace();
             }
             System.out.close(); // 关闭文件输出流
-            System.setIn(originalIn); // 恢复控制台输入
-            System.setOut(originalOut); // 恢复控制台输出
+//            System.setIn(originalIn); // 恢复控制台输入
+//            System.setOut(originalOut); // 恢复控制台输出
         }
     }
 
