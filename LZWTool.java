@@ -35,7 +35,8 @@ public class LZWTool
         int minW = 3;
         int maxW = 4;
         String policy = "freeze";
-        String alphabetPath = "alphabets/tobeornot.txt";
+//        String alphabetPath = "alphabets/tobeornot.txt";
+        String alphabetPath="";
 
         for (int i = 0; i < args.length; i++)
         {
@@ -51,8 +52,7 @@ public class LZWTool
                     maxW = Integer.parseInt(args[++i]);
                     break;
                 case "--policy":
-//                    policy = args[++i];
-                    policy = "freeze";
+                    policy = args[++i];
                     break;
                 case "--alphabet":
                     alphabetPath = args[++i];
@@ -481,6 +481,8 @@ public class LZWTool
         // Read header
         HeaderInfo info = readHeader();
 
+        System.err.println("本次策略是:"+ info.policy);
+
         int W = info.minW;
         int maxCodeLimit = (1 << info.maxW);
 
@@ -579,7 +581,7 @@ public class LZWTool
             int stopCode = (1 << W) - 1;
             if (code == stopCode)
             {
-                break;
+                if (!info.policy.equals("freeze"))break;
             }
 
             String entry;
@@ -622,6 +624,7 @@ public class LZWTool
             }
             else
             {
+                System.err.println("nextCode 是:"+nextCode);
                 // Codebook full - apply eviction policy
                 if (info.policy.equals("reset"))
                 {
