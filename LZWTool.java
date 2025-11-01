@@ -1,4 +1,3 @@
-
 import java.io.*;
 import java.util.*;
 
@@ -575,7 +574,7 @@ public class LZWTool
 
             // Check for stop code
             int stopCode = (1 << W) - 1;
-            if (code == stopCode&&!info.policy.equals("freeze"))
+            if (code == stopCode)
             {
                 break;
             }
