@@ -581,7 +581,7 @@ public class LZWTool
             int stopCode = (1 << W) - 1;
             if (code == stopCode)
             {
-                if (!info.policy.equals("freeze"))break;
+                break;
             }
 
             String entry;
