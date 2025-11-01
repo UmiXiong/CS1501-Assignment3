@@ -2,22 +2,42 @@ import java.io.*;
 import java.util.*;
 
 /**
- * LZWTool - A configurable LZW compression and decompression tool
- * Supports variable codeword width, custom alphabets, and multiple eviction policies
- *
- * 修复：
- * - 在 header 中加入 codeCount（32-bit），压缩端先缓冲写出的 code+width，再写 header+codes，
- *   解压端依据 codeCount 精确读取编码个数，避免因位填充导致多读一个 code。
+ * LZWTool - A configurable LZW compression and decompression tool Supports variable codeword width, custom alphabets,
+ * and multiple eviction policies
  */
 public class LZWTool
 {
+
+    //    private static boolean DEBUG = false;
+//    private static void printCodebook(Map<?, ?> codebook, String name) {
+//        System.err.println("\n===== " + name + " Codebook Contents =====");
+//        if (codebook.isEmpty()) {
+//            System.err.println("Codebook is empty");
+//            return;
+//        }
+//        for (Map.Entry<?, ?> entry : codebook.entrySet()) {
+//            System.err.printf("Key: %-5s Value: %s%n", entry.getKey(), entry.getValue());
+//        }
+//        System.err.println("=============================\n");
+//    }
     public static void main(String[] args)
     {
-        String mode = null;
+        // Parse command-line arguments
+//        String mode = "compress";
+//        String inputFile ="TestFiles/test2.txt";
+//        String outputFile ="TestFiles/test2_output.lzw";
+
+//        String mode ="expand";
+//        String inputFile ="TestFiles/test2_output.lzw";
+//        String outputFile ="TestFiles/test2_back.txt";
+
+//        String alphabetPath = "alphabets/abrcd.txt";
+
+        String mode=null;
         int minW = 3;
         int maxW = 4;
         String policy = "reset";
-        String alphabetPath = null;
+        String alphabetPath=null;
 
         for (int i = 0; i < args.length; i++)
         {
@@ -44,6 +64,7 @@ public class LZWTool
             }
         }
 
+        // Validate arguments
         if (mode == null)
         {
             System.err.println("Error: --mode is required");
@@ -56,8 +77,28 @@ public class LZWTool
             System.exit(1);
         }
 
+
+//        InputStream originalIn = System.in;
+//        PrintStream originalOut = System.out;
+
+        // Execute compression or expansion
         try
         {
+
+//            FileInputStream fileIn = new FileInputStream(inputFile);
+//            System.setIn(fileIn);
+//
+//            File file = new File(outputFile);
+//            //文件存在删除，创建新文件
+//            if (file.exists()) {
+//                file.delete();
+//            }
+//            file.createNewFile();
+//
+//            FileOutputStream fileOut = new FileOutputStream(outputFile);
+//            PrintStream printOut = new PrintStream(fileOut);
+//            System.setOut(printOut);
+
             if (mode.equals("compress"))
             {
                 if (alphabetPath == null)
@@ -83,8 +124,23 @@ public class LZWTool
             e.printStackTrace();
             System.exit(1);
         }
+//        finally
+//        {
+//            // 4. 恢复原始的输入流和输出流（避免影响后续操作）
+//            try {
+//                System.in.close(); // 关闭文件输入流
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//            System.out.close(); // 关闭文件输出流
+//            System.setIn(originalIn); // 恢复控制台输入
+//            System.setOut(originalOut); // 恢复控制台输出
+//        }
     }
 
+    /**
+     * Read alphabet from file
+     */
     private static List<String> readAlphabet(String path) throws IOException
     {
         List<String> alphabet = new ArrayList<>();
@@ -95,10 +151,6 @@ public class LZWTool
             String line;
             while ((line = reader.readLine()) != null)
             {
-                if (line != null)
-                {
-                    line = line.trim();
-                }
                 if (!line.isEmpty() && !seen.contains(line))
                 {
                     seen.add(line);
@@ -111,13 +163,17 @@ public class LZWTool
     }
 
     /**
-     * 写 header：minW(8) maxW(8) policy(8) alphabetSize(16) alphabetSymbols(每个1 byte) codeCount(32)
+     * Write header to compressed file
      */
-    private static void writeHeader(int minW, int maxW, String policy, List<String> alphabet, int codeCount)
+    private static void writeHeader(int minW, int maxW, String policy, List<String> alphabet)
     {
+        // Write minW (1 byte)
         BinaryStdOut.write(minW, 8);
+
+        // Write maxW (1 byte)
         BinaryStdOut.write(maxW, 8);
 
+        // Write policy as integer (1 byte)
         int policyCode = 0;
         switch (policy)
         {
@@ -136,25 +192,30 @@ public class LZWTool
         }
         BinaryStdOut.write(policyCode, 8);
 
+        // Write alphabet size (2 bytes)
         BinaryStdOut.write(alphabet.size(), 16);
 
+        // Write each alphabet symbol (1 byte per symbol)
         for (String symbol : alphabet)
         {
-            char ch = symbol.isEmpty() ? '\0' : symbol.charAt(0);
-            BinaryStdOut.write(ch, 8);
+            BinaryStdOut.write(symbol.charAt(0), 8);
         }
-
-        // 写入实际 code 数（32-bit），解码端会精确读取这么多个 code
-        BinaryStdOut.write(codeCount, 32);
     }
 
+    /**
+     * Read header from compressed file
+     */
     private static HeaderInfo readHeader()
     {
         HeaderInfo info = new HeaderInfo();
 
+        // Read minW
         info.minW = BinaryStdIn.readInt(8);
+
+        // Read maxW
         info.maxW = BinaryStdIn.readInt(8);
 
+        // Read policy
         int policyCode = BinaryStdIn.readInt(8);
         switch (policyCode)
         {
@@ -170,12 +231,12 @@ public class LZWTool
             case 3:
                 info.policy = "lfu";
                 break;
-            default:
-                info.policy = "reset";
-                break;
         }
 
+        // Read alphabet size
         int alphabetSize = BinaryStdIn.readInt(16);
+
+        // Read alphabet
         info.alphabet = new ArrayList<>();
         for (int i = 0; i < alphabetSize; i++)
         {
@@ -183,23 +244,25 @@ public class LZWTool
             info.alphabet.add(String.valueOf(c));
         }
 
-        // 读取 codeCount（32-bit）
-        info.codeCount = BinaryStdIn.readInt(32);
-
         return info;
     }
 
     /**
-     * Compress：不直接写 header，而是在内存中记录写出的 code 列表与对应写入时的宽度，
-     * 完成后写 header（包含 codeCount）并按记录写入所有 code（使用各自宽度）。
+     * Compress input using LZW algorithm
      */
     private static void compress(int minW, int maxW, String policy, String alphabetPath) throws IOException
     {
+        // Read alphabet from file
         List<String> alphabet = readAlphabet(alphabetPath);
 
+        // Write header
+        writeHeader(minW, maxW, policy, alphabet);
+
+        // Initialize compression state
         int W = minW;
         int maxCodeLimit = (1 << maxW);
 
+        // Build initial codebook: use HashMap for pattern->code so we can remove old patterns when evicting
         Map<String, Integer> codebook = new HashMap<>();
         Map<Integer, String> reverseCodebook = new HashMap<>();
         int nextCode = 0;
@@ -211,6 +274,10 @@ public class LZWTool
             nextCode++;
         }
 
+        // 打印初始Codebook
+//        printCodebook(reverseCodebook, "初始化时");
+
+        // Tracking for eviction policies
         Map<Integer, Integer> frequency = new HashMap<>();
         Map<Integer, Integer> lastUsed = new HashMap<>();
         int timestamp = 0;
@@ -221,11 +288,10 @@ public class LZWTool
             lastUsed.put(i, 0);
         }
 
+        // Process input
         StringBuilder current = new StringBuilder();
 
-        // 缓冲写出的 codes 与相应的 widths（W）
-        List<Integer> codes = new ArrayList<>();
-        List<Integer> widths = new ArrayList<>();
+        StringBuffer sb = new StringBuffer();
 
         while (!BinaryStdIn.isEmpty())
         {
@@ -233,28 +299,34 @@ public class LZWTool
             StringBuilder next = new StringBuilder(current).append(c);
             String nextStr = next.toString();
 
+            System.err.println("当前字符: " + current);
+            System.err.println("下一个字符: " + next);
+
             if (codebook.containsKey(nextStr))
             {
                 current = next;
             }
             else
             {
+                // Output code for current
                 if (current.length() > 0)
                 {
                     String currentStr = current.toString();
                     Integer code = codebook.get(currentStr);
                     if (code != null)
                     {
-                        // 记录 code 与当时的宽度（随后再一次性输出）
-                        codes.add(code);
-                        widths.add(W);
+                        sb.append(code);
+                        System.err.println("编码:"+sb.toString());
+                        BinaryStdOut.write(code, W);
                         frequency.put(code, frequency.getOrDefault(code, 0) + 1);
                         lastUsed.put(code, timestamp++);
                     }
                 }
 
+                // Try to add new pattern
                 if (nextCode < maxCodeLimit)
                 {
+                    // Increase width if needed BEFORE adding the new code
                     if (nextCode == (1 << W) && W < maxW)
                     {
                         W++;
@@ -265,12 +337,16 @@ public class LZWTool
                     frequency.put(nextCode, 0);
                     lastUsed.put(nextCode, timestamp);
                     nextCode++;
+
+                    // 打印更新后的Codebook
+//                    printCodebook(reverseCodebook, "添加新码表后");
                 }
                 else
                 {
-                    // Codebook full: 按策略替换或 reset（与原逻辑一致）
+                    // Codebook full - apply eviction policy
                     if (policy.equals("reset"))
                     {
+                        // Reset to alphabet only
                         codebook = new HashMap<>();
                         reverseCodebook.clear();
                         frequency.clear();
@@ -288,6 +364,7 @@ public class LZWTool
 
                         W = minW;
 
+                        // Add the new pattern
                         if (nextCode == (1 << W) && W < maxW)
                         {
                             W++;
@@ -298,9 +375,12 @@ public class LZWTool
                         frequency.put(nextCode, 0);
                         lastUsed.put(nextCode, timestamp);
                         nextCode++;
+
+//                        printCodebook(reverseCodebook, "reset码表后");
                     }
                     else if (policy.equals("lru"))
                     {
+                        // Find LRU code (excluding alphabet)
                         int lruCode = -1;
                         int minTime = Integer.MAX_VALUE;
 
@@ -320,19 +400,23 @@ public class LZWTool
                         if (lruCode >= 0)
                         {
                             String oldPattern = reverseCodebook.get(lruCode);
+                            // remove old pattern from pattern->code map to keep consistency
                             if (oldPattern != null)
                             {
                                 codebook.remove(oldPattern);
                             }
 
+                            // Replace with new pattern
                             codebook.put(nextStr, lruCode);
                             reverseCodebook.put(lruCode, nextStr);
                             frequency.put(lruCode, 0);
                             lastUsed.put(lruCode, timestamp);
                         }
+//                        printCodebook(reverseCodebook, "lru更新码表后");
                     }
                     else if (policy.equals("lfu"))
                     {
+                        // Find LFU code (excluding alphabet)
                         int lfuCode = -1;
                         int minFreq = Integer.MAX_VALUE;
 
@@ -357,54 +441,51 @@ public class LZWTool
                                 codebook.remove(oldPattern);
                             }
 
+                            // Replace with new pattern
                             codebook.put(nextStr, lfuCode);
                             reverseCodebook.put(lfuCode, nextStr);
                             frequency.put(lfuCode, 0);
                             lastUsed.put(lfuCode, timestamp);
                         }
+//                        printCodebook(reverseCodebook, "lfu更新码表后");
                     }
-                    // freeze: do nothing
+                    // else freeze - do nothing
                 }
 
                 current = new StringBuilder().append(c);
             }
         }
 
-        // 最后剩余的 current 输出（缓冲）
+        // Output final code
         if (current.length() > 0)
         {
             Integer code = codebook.get(current.toString());
             if (code != null)
             {
-                codes.add(code);
-                widths.add(W);
+                BinaryStdOut.write(code, W);
+                sb.append(code);
             }
         }
-
-        // 写 header（现在可以写 codeCount）
-        int codeCount = codes.size();
-        writeHeader(minW, maxW, policy, alphabet, codeCount);
-
-        // 按记录的 widths 将 codes 写入输出流
-        for (int i = 0; i < codeCount; i++)
-        {
-            BinaryStdOut.write(codes.get(i), widths.get(i));
-        }
+        System.err.println("编码:"+sb.toString());
+        // Write stop code (use maximum possible value for current width as EOF marker)
+        int stopCode = (1 << W) - 1;
+        BinaryStdOut.write(stopCode, W);
 
         BinaryStdOut.close();
     }
 
     /**
-     * Expand：依据 header 的 codeCount 精确读取 N 个 code（读第1个，然后读剩余 count-1 次）。
-     * 读取顺序中仍保持与 encoder 一致的增宽、添加字典与替换时机。
+     * Expand compressed input
      */
     private static void expand() throws IOException
     {
+        // Read header
         HeaderInfo info = readHeader();
 
         int W = info.minW;
         int maxCodeLimit = (1 << info.maxW);
 
+        // Build initial codebook
         Map<Integer, String> codebook = new HashMap<>();
         int nextCode = 0;
 
@@ -412,7 +493,10 @@ public class LZWTool
         {
             codebook.put(nextCode++, symbol);
         }
+        // 打印初始Codebook
+//        printCodebook(codebook, "初始化时");
 
+        // Tracking for eviction policies
         Map<Integer, Integer> frequency = new HashMap<>();
         Map<Integer, Integer> lastUsed = new HashMap<>();
         int timestamp = 0;
@@ -423,52 +507,61 @@ public class LZWTool
             lastUsed.put(i, 0);
         }
 
-        // 如果初始字典大小已经填满当前 W 的容量，和 encoder 保持一致地增加 W
+        // Possibly increase width BEFORE reading first code if initial codebook size reaches the current width capacity
         if (nextCode == (1 << W) && W < info.maxW)
         {
             W++;
         }
+        System.err.println("字典下一code:"+nextCode+"当前码长:"+W);
 
-        int totalCodes = info.codeCount;
-        if (totalCodes <= 0)
+        // Read first code
+        if (BinaryStdIn.isEmpty())
         {
             BinaryStdOut.close();
             return;
         }
+        StringBuffer sbCode = new StringBuffer();
+        StringBuffer sbContent = new StringBuffer();
 
-        // 读取第一个 code（必须存在）
-        int prevCode;
-        try
-        {
-            prevCode = BinaryStdIn.readInt(W);
-        }
-        catch (NoSuchElementException e)
-        {
-            BinaryStdOut.close();
-            return;
-        }
-
+        int prevCode = BinaryStdIn.readInt(W);
+        sbCode.append(prevCode);
+        System.err.println("编码:"+sbCode);
         String prevString = codebook.get(prevCode);
+
         if (prevString == null)
         {
             BinaryStdOut.close();
             return;
         }
+        sbContent.append(prevString);
+        System.err.println("内容:"+sbContent);
 
         BinaryStdOut.write(prevString);
         frequency.put(prevCode, frequency.getOrDefault(prevCode, 0) + 1);
         lastUsed.put(prevCode, timestamp++);
 
-        // 已读取的 code 数 = 1
-        int readSoFar = 1;
-
-        while (readSoFar < totalCodes)
+        // Process remaining codes
+        while (!BinaryStdIn.isEmpty())
         {
-            // 在读取下一个 code 之前，保持与 encoder 一致地检查是否需要增加 W
+            // Possibly increase width BEFORE reading the next code so decoder stays in sync with encoder
             if (nextCode == (1 << W) && W < info.maxW)
             {
                 W++;
             }
+            System.err.println("字典下一code:"+nextCode+"当前码长:"+W);
+            if (nextCode == (1 << W) && W == info.maxW)
+            {
+                if (info.policy.equals("reset"))
+                {
+                    W = info.minW;
+                    System.err.println("字典下一code超出最大范围重新设置码长:"+W);
+                }
+                if (info.policy.equals("freeze"))
+                {
+                    System.err.println("字典固定");
+                }
+            }
+
 
             int code;
             try
@@ -477,34 +570,45 @@ public class LZWTool
             }
             catch (NoSuchElementException e)
             {
-                // 流异常终止（不应出现，因为 header 给出了确切的 codeCount），但我们优雅地结束
+                // End of stream reached
+                break;
+            }
+            sbCode.append(code);
+            System.err.println("编码:"+sbCode);
+
+            // Check for stop code
+            int stopCode = (1 << W) - 1;
+            if (code == stopCode)
+            {
                 break;
             }
 
-            readSoFar++;
-
             String entry;
+
             if (codebook.containsKey(code))
             {
                 entry = codebook.get(code);
             }
             else if (code == nextCode)
             {
-                // KwKwK 特殊情况
+                // Special case: code not yet in codebook
                 entry = prevString + prevString.charAt(0);
             }
             else
             {
-                throw new RuntimeException("Invalid code during expand: " + code);
+                throw new RuntimeException("Invalid code: " + code);
             }
+            sbContent.append(entry);
+            System.err.println("内容:"+sbContent);
 
             BinaryStdOut.write(entry);
             frequency.put(code, frequency.getOrDefault(code, 0) + 1);
             lastUsed.put(code, timestamp++);
 
-            // 在添加新 entry 前，先判断是否还有空间或是否需按策略替换（镜像 encoder 行为）
+            // Add new entry to codebook
             if (nextCode < maxCodeLimit)
             {
+                // Check if we need to increase width BEFORE adding
                 if (nextCode == (1 << W) && W < info.maxW)
                 {
                     W++;
@@ -515,12 +619,14 @@ public class LZWTool
                 frequency.put(nextCode, 0);
                 lastUsed.put(nextCode, timestamp);
                 nextCode++;
+//                printCodebook(codebook, "添加新码表后");
             }
             else
             {
-                // 字典已满，按策略处理
+                // Codebook full - apply eviction policy
                 if (info.policy.equals("reset"))
                 {
+                    // Reset to alphabet only
                     codebook.clear();
                     nextCode = 0;
 
@@ -534,6 +640,7 @@ public class LZWTool
 
                     W = info.minW;
 
+                    // Add the new pattern
                     if (nextCode == (1 << W) && W < info.maxW)
                     {
                         W++;
@@ -547,6 +654,7 @@ public class LZWTool
                 }
                 else if (info.policy.equals("lru"))
                 {
+                    // Find LRU code (excluding alphabet)
                     int lruCode = -1;
                     int minTime = Integer.MAX_VALUE;
 
@@ -573,6 +681,7 @@ public class LZWTool
                 }
                 else if (info.policy.equals("lfu"))
                 {
+                    // Find LFU code (excluding alphabet)
                     int lfuCode = -1;
                     int minFreq = Integer.MAX_VALUE;
 
@@ -597,22 +706,30 @@ public class LZWTool
                         lastUsed.put(lfuCode, timestamp);
                     }
                 }
-                // freeze: do nothing
+                // else freeze - do nothing
             }
 
             prevString = entry;
-            //prevCode = code; // not actually required further, kept for clarity
+            prevCode = code;
+        }
+        if(info.policy.equals("freeze")){
+            System.err.println("艹");
         }
 
         BinaryStdOut.close();
     }
 
+    /**
+     * Helper class to store header information
+     */
     private static class HeaderInfo
     {
         int minW;
+
         int maxW;
+
         String policy;
+
         List<String> alphabet;
-        int codeCount;
     }
 }
