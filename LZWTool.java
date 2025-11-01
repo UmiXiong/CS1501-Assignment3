@@ -27,10 +27,11 @@ public class LZWTool
 //        String inputFile ="TestFiles/test2.txt";
 //        String outputFile ="TestFiles/test2_output.lzw";
 
-        String mode ="expand";
-        String inputFile ="TestFiles/test2_output.lzw";
-        String outputFile ="TestFiles/test2_back.txt";
+//        String mode ="expand";
+//        String inputFile ="TestFiles/test2_output.lzw";
+//        String outputFile ="TestFiles/test2_back.txt";
 
+        String mode=null;
         int minW = 3;
         int maxW = 4;
         String policy = "freeze";
@@ -76,26 +77,26 @@ public class LZWTool
         }
 
 
-        InputStream originalIn = System.in;
-        PrintStream originalOut = System.out;
+//        InputStream originalIn = System.in;
+//        PrintStream originalOut = System.out;
 
         // Execute compression or expansion
         try
         {
 
-            FileInputStream fileIn = new FileInputStream(inputFile);
-            System.setIn(fileIn);
-
-            File file = new File(outputFile);
-            //文件存在删除，创建新文件
-            if (file.exists()) {
-                file.delete();
-            }
-            file.createNewFile();
-
-            FileOutputStream fileOut = new FileOutputStream(outputFile);
-            PrintStream printOut = new PrintStream(fileOut);
-            System.setOut(printOut);
+//            FileInputStream fileIn = new FileInputStream(inputFile);
+//            System.setIn(fileIn);
+//
+//            File file = new File(outputFile);
+//            //文件存在删除，创建新文件
+//            if (file.exists()) {
+//                file.delete();
+//            }
+//            file.createNewFile();
+//
+//            FileOutputStream fileOut = new FileOutputStream(outputFile);
+//            PrintStream printOut = new PrintStream(fileOut);
+//            System.setOut(printOut);
 
             if (mode.equals("compress"))
             {
