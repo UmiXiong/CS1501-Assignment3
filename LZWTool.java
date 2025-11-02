@@ -31,12 +31,12 @@ public class LZWTool
 //        String inputFile ="TestFiles/test2_output.lzw";
 //        String outputFile ="TestFiles/test2_back.txt";
 
+//        String alphabetPath = "alphabets/abrcd.txt";
+
         String mode=null;
         int minW = 3;
         int maxW = 4;
-        String policy = "freeze";
-        //String alphabetPath = "alphabets/toberh.txt";
-//        String alphabetPath = "alphabets/abrcd.txt";
+        String policy = "reset";
         String alphabetPath=null;
 
         for (int i = 0; i < args.length; i++)
@@ -124,18 +124,18 @@ public class LZWTool
             e.printStackTrace();
             System.exit(1);
         }
-        finally
-        {
-            // 4. 恢复原始的输入流和输出流（避免影响后续操作）
-            try {
-                System.in.close(); // 关闭文件输入流
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            System.out.close(); // 关闭文件输出流
+//        finally
+//        {
+//            // 4. 恢复原始的输入流和输出流（避免影响后续操作）
+//            try {
+//                System.in.close(); // 关闭文件输入流
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//            System.out.close(); // 关闭文件输出流
 //            System.setIn(originalIn); // 恢复控制台输入
 //            System.setOut(originalOut); // 恢复控制台输出
-        }
+//        }
     }
 
     /**
@@ -262,9 +262,6 @@ public class LZWTool
         int W = minW;
         int maxCodeLimit = (1 << maxW);
 
-        int stopCode = maxCodeLimit - 1; // 预留最大值为stopCode（如maxW=4时为15）
-
-
         // Build initial codebook: use HashMap for pattern->code so we can remove old patterns when evicting
         Map<String, Integer> codebook = new HashMap<>();
         Map<Integer, String> reverseCodebook = new HashMap<>();
@@ -275,9 +272,6 @@ public class LZWTool
             codebook.put(symbol, nextCode);
             reverseCodebook.put(nextCode, symbol);
             nextCode++;
-            if (nextCode >= stopCode) {
-                break; // 避免码表占用stopCode
-            }
         }
 
         // 打印初始Codebook
@@ -330,8 +324,7 @@ public class LZWTool
                 }
 
                 // Try to add new pattern
-                //if (nextCode < maxCodeLimit)
-                if (nextCode < stopCode)
+                if (nextCode < maxCodeLimit)
                 {
                     // Increase width if needed BEFORE adding the new code
                     if (nextCode == (1 << W) && W < maxW)
@@ -419,7 +412,7 @@ public class LZWTool
                             frequency.put(lruCode, 0);
                             lastUsed.put(lruCode, timestamp);
                         }
-//                        printCodebook(reverseCodebook, "lru更新码表index:"+lruCode+"后");
+//                        printCodebook(reverseCodebook, "lru更新码表后");
                     }
                     else if (policy.equals("lfu"))
                     {
@@ -475,7 +468,7 @@ public class LZWTool
         }
         System.err.println("编码:"+sb.toString());
         // Write stop code (use maximum possible value for current width as EOF marker)
-        stopCode = (1 << W) - 1;
+        int stopCode = (1 << W) - 1;
         BinaryStdOut.write(stopCode, W);
 
         BinaryStdOut.close();
@@ -556,8 +549,7 @@ public class LZWTool
                 W++;
             }
             System.err.println("字典下一code:"+nextCode+"当前码长:"+W);
-            if (nextCode == (1 << W)-1 && W == info.maxW)
-            //if (nextCode == (1 << W) && W == info.maxW)
+            if (nextCode == (1 << W) && W == info.maxW)
             {
                 if (info.policy.equals("reset"))
                 {
@@ -581,10 +573,9 @@ public class LZWTool
             System.err.println("编码:"+sbCode);
 
             // Check for stop code
-            int stopCode = (1 << info.maxW) - 1;
+            int stopCode = (1 << W) - 1;
             if (code == stopCode)
             {
-                System.err.println("读到stopCode，退出解压");
                 break;
             }
 
@@ -611,7 +602,7 @@ public class LZWTool
             lastUsed.put(code, timestamp++);
 
             // Add new entry to codebook
-            if (nextCode < maxCodeLimit-1)
+            if (nextCode < maxCodeLimit)
             {
                 // Check if we need to increase width BEFORE adding
                 if (nextCode == (1 << W) && W < info.maxW)
