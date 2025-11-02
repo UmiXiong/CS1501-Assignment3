@@ -23,20 +23,18 @@ public class LZWTool
     public static void main(String[] args)
     {
         // Parse command-line arguments
-//        String mode = "compress";
-//        String inputFile ="TestFiles/test3.txt";
-//        String outputFile ="TestFiles/test3_output.lzw";
+        String mode = "compress";
+        String inputFile ="TestFiles/test3.txt";
+        String outputFile ="TestFiles/test3_output.lzw";
 
 //        String mode ="expand";
 //        String inputFile ="TestFiles/test3_output.lzw";
 //        String outputFile ="TestFiles/test3_back.txt";
 
-        String mode=null;
         int minW = 3;
         int maxW = 4;
         String policy = "freeze";
-//        String alphabetPath = "alphabets/tobeornot.txt";
-        String alphabetPath=null;
+        String alphabetPath = "alphabets/toberh.txt";
 
         for (int i = 0; i < args.length; i++)
         {
@@ -83,7 +81,7 @@ public class LZWTool
         // Execute compression or expansion
         try
         {
-//
+
 //            FileInputStream fileIn = new FileInputStream(inputFile);
 //            System.setIn(fileIn);
 //
@@ -123,18 +121,18 @@ public class LZWTool
             e.printStackTrace();
             System.exit(1);
         }
-//        finally
-//        {
-//            // 4. 恢复原始的输入流和输出流（避免影响后续操作）
-//            try {
-//                System.in.close(); // 关闭文件输入流
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//            System.out.close(); // 关闭文件输出流
+        finally
+        {
+            // 4. 恢复原始的输入流和输出流（避免影响后续操作）
+            try {
+                System.in.close(); // 关闭文件输入流
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.out.close(); // 关闭文件输出流
 //            System.setIn(originalIn); // 恢复控制台输入
 //            System.setOut(originalOut); // 恢复控制台输出
-//        }
+        }
     }
 
     /**
