@@ -611,7 +611,7 @@ public class LZWTool
             lastUsed.put(code, timestamp++);
 
             // Add new entry to codebook
-            if (nextCode < maxCodeLimit)
+            if (nextCode < maxCodeLimit-1)
             {
                 // Check if we need to increase width BEFORE adding
                 if (nextCode == (1 << W) && W < info.maxW)
