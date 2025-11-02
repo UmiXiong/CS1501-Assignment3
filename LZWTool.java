@@ -5,8 +5,6 @@ import java.util.*;
  * LZWTool - A configurable LZW compression and decompression tool Supports variable codeword width, custom alphabets,
  * and multiple eviction policies
  */
-//
-//
 public class LZWTool
 {
 
@@ -35,10 +33,13 @@ public class LZWTool
 
 //        String alphabetPath = "alphabets/abrcd.txt";
 
+//
+
+//        final tries
         String mode=null;
-        int minW = 3;
-        int maxW = 4;
-        String policy = "reset";
+        int minW = 9;
+        int maxW = 16;
+        String policy = "freeze";
         String alphabetPath=null;
 
         for (int i = 0; i < args.length; i++)
@@ -252,7 +253,7 @@ public class LZWTool
     /**
      * Compress input using LZW algorithm
      */
-    private static void compress(int minW, int maxW, String policy, String alphabetPath) throws IOException
+    public static void compress(int minW, int maxW, String policy, String alphabetPath) throws IOException
     {
         // Read alphabet from file
         List<String> alphabet = readAlphabet(alphabetPath);
@@ -264,6 +265,9 @@ public class LZWTool
         int W = minW;
         int maxCodeLimit = (1 << maxW);
 
+        int stopCode = maxCodeLimit - 1; // 预留最大值为stopCode（如maxW=4时为15）
+
+
         // Build initial codebook: use HashMap for pattern->code so we can remove old patterns when evicting
         Map<String, Integer> codebook = new HashMap<>();
         Map<Integer, String> reverseCodebook = new HashMap<>();
@@ -274,6 +278,9 @@ public class LZWTool
             codebook.put(symbol, nextCode);
             reverseCodebook.put(nextCode, symbol);
             nextCode++;
+            if (nextCode >= stopCode) {
+                break; // 避免码表占用stopCode
+            }
         }
 
         // 打印初始Codebook
@@ -301,8 +308,8 @@ public class LZWTool
             StringBuilder next = new StringBuilder(current).append(c);
             String nextStr = next.toString();
 
-            System.err.println("当前字符: " + current);
-            System.err.println("下一个字符: " + next);
+            //System.err.println("当前字符: " + current);
+            //System.err.println("下一个字符: " + next);
 
             if (codebook.containsKey(nextStr))
             {
@@ -318,7 +325,7 @@ public class LZWTool
                     if (code != null)
                     {
                         sb.append(code);
-                        System.err.println("编码:"+sb.toString());
+                        //System.err.println("编码:"+sb.toString());
                         BinaryStdOut.write(code, W);
                         frequency.put(code, frequency.getOrDefault(code, 0) + 1);
                         lastUsed.put(code, timestamp++);
@@ -326,7 +333,8 @@ public class LZWTool
                 }
 
                 // Try to add new pattern
-                if (nextCode < maxCodeLimit)
+                //if (nextCode < maxCodeLimit)
+                if (nextCode < stopCode)
                 {
                     // Increase width if needed BEFORE adding the new code
                     if (nextCode == (1 << W) && W < maxW)
@@ -468,9 +476,9 @@ public class LZWTool
                 sb.append(code);
             }
         }
-        System.err.println("编码:"+sb.toString());
+        //System.err.println("编码:"+sb.toString());
         // Write stop code (use maximum possible value for current width as EOF marker)
-        int stopCode = (1 << W) - 1;
+        stopCode = (1 << W) - 1;
         BinaryStdOut.write(stopCode, W);
 
         BinaryStdOut.close();
@@ -479,7 +487,7 @@ public class LZWTool
     /**
      * Expand compressed input
      */
-    private static void expand() throws IOException
+    public static void expand() throws IOException
     {
         // Read header
         HeaderInfo info = readHeader();
@@ -514,7 +522,7 @@ public class LZWTool
         {
             W++;
         }
-        System.err.println("字典下一code:"+nextCode+"当前码长:"+W);
+        //System.err.println("字典下一code:"+nextCode+"当前码长:"+W);
 
         // Read first code
         if (BinaryStdIn.isEmpty())
@@ -527,7 +535,7 @@ public class LZWTool
 
         int prevCode = BinaryStdIn.readInt(W);
         sbCode.append(prevCode);
-        System.err.println("编码:"+sbCode);
+        //System.err.println("编码:"+sbCode);
         String prevString = codebook.get(prevCode);
 
         if (prevString == null)
@@ -536,7 +544,7 @@ public class LZWTool
             return;
         }
         sbContent.append(prevString);
-        System.err.println("内容:"+sbContent);
+        //System.err.println("内容:"+sbContent);
 
         BinaryStdOut.write(prevString);
         frequency.put(prevCode, frequency.getOrDefault(prevCode, 0) + 1);
@@ -550,13 +558,14 @@ public class LZWTool
             {
                 W++;
             }
-            System.err.println("字典下一code:"+nextCode+"当前码长:"+W);
-            if (nextCode == (1 << W) && W == info.maxW)
+            //System.err.println("字典下一code:"+nextCode+"当前码长:"+W);
+            if (nextCode == (1 << W)-1 && W == info.maxW)
+            //if (nextCode == (1 << W) && W == info.maxW)
             {
                 if (info.policy.equals("reset"))
                 {
                     W = info.minW;
-                    System.err.println("字典下一code超出最大范围重新设置码长:"+W);
+                    //System.err.println("字典下一code超出最大范围重新设置码长:"+W);
                 }
             }
 
@@ -572,7 +581,7 @@ public class LZWTool
                 break;
             }
             sbCode.append(code);
-            System.err.println("编码:"+sbCode);
+            //System.err.println("编码:"+sbCode);
 
             // Check for stop code
             int stopCode = (1 << W) - 1;
@@ -597,14 +606,15 @@ public class LZWTool
                 throw new RuntimeException("Invalid code: " + code);
             }
             sbContent.append(entry);
-            System.err.println("内容:"+sbContent);
+            //System.err.println("内容:"+sbContent);
 
             BinaryStdOut.write(entry);
             frequency.put(code, frequency.getOrDefault(code, 0) + 1);
             lastUsed.put(code, timestamp++);
 
             // Add new entry to codebook
-            if (nextCode < maxCodeLimit)
+            //if (nextCode < maxCodeLimit)
+            if (nextCode < maxCodeLimit-1)
             {
                 // Check if we need to increase width BEFORE adding
                 if (nextCode == (1 << W) && W < info.maxW)
