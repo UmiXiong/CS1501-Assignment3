@@ -20,8 +20,7 @@ public class LZWTool
         }
         System.err.println("=============================\n");
     }
-    public static void main(String[] args)
-    {
+    public static void main(String[] args) {
         // Parse command-line arguments
 //        String mode = "compress";
 //        String inputFile ="TestFiles/test3.txt";
@@ -31,17 +30,15 @@ public class LZWTool
 //        String inputFile ="TestFiles/test3_output.lzw";
 //        String outputFile ="TestFiles/test3_back.txt";
 
-        String mode=null;
+        String mode = null;
         int minW = 3;
         int maxW = 4;
         String policy = "freeze";
 //        String alphabetPath = "alphabets/tobeornot.txt";
-        String alphabetPath=null;
+        String alphabetPath = null;
 
-        for (int i = 0; i < args.length; i++)
-        {
-            switch (args[i])
-            {
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
                 case "--mode":
                     mode = args[++i];
                     break;
@@ -64,14 +61,12 @@ public class LZWTool
         }
 
         // Validate arguments
-        if (mode == null)
-        {
+        if (mode == null) {
             System.err.println("Error: --mode is required");
             System.exit(1);
         }
 
-        if (minW > maxW)
-        {
+        if (minW > maxW) {
             System.err.println("Error: minW must be <= maxW");
             System.exit(1);
         }
@@ -81,8 +76,7 @@ public class LZWTool
 //        PrintStream originalOut = System.out;
 
         // Execute compression or expansion
-        try
-        {
+        try {
 
 //            FileInputStream fileIn = new FileInputStream(inputFile);
 //            System.setIn(fileIn);
@@ -98,45 +92,37 @@ public class LZWTool
 //            PrintStream printOut = new PrintStream(fileOut);
 //            System.setOut(printOut);
 
-            if (mode.equals("compress"))
-            {
-                if (alphabetPath == null)
-                {
+            if (mode.equals("compress")) {
+                if (alphabetPath == null) {
                     System.err.println("Error: --alphabet is required for compression");
                     System.exit(1);
                 }
                 compress(minW, maxW, policy, alphabetPath);
-            }
-            else if (mode.equals("expand"))
-            {
+            } else if (mode.equals("expand")) {
                 expand();
-            }
-            else
-            {
+            } else {
                 System.err.println("Error: mode must be 'compress' or 'expand'");
                 System.exit(1);
             }
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
             System.exit(1);
         }
-        finally
-        {
-            // 4. 恢复原始的输入流和输出流（避免影响后续操作）
-            try {
-                System.in.close(); // 关闭文件输入流
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            System.out.close(); // 关闭文件输出流
+//        finally
+//        {
+//            // 4. 恢复原始的输入流和输出流（避免影响后续操作）
+//            try {
+//                System.in.close(); // 关闭文件输入流
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//            System.out.close(); // 关闭文件输出流
 //            System.setIn(originalIn); // 恢复控制台输入
 //            System.setOut(originalOut); // 恢复控制台输出
-        }
+//        }
+//    }
     }
-
     /**
      * Read alphabet from file
      */
