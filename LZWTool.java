@@ -710,15 +710,15 @@ public class LZWTool
             prevCode = code;
         }
         // 剔除由填充比特导致的收尾 0 码对应内容
-//        if (lastCode == 0 && !info.alphabet.isEmpty())
-//        {
-//            String firstSymbol = info.alphabet.get(0);  // 0 码对应符号
-//            if (sbContent.toString().endsWith(firstSymbol))
-//            {
-//                // 移除收尾的无效符号
-//                sbContent.setLength(sbContent.length() - firstSymbol.length());
-//            }
-//        }
+        if (lastCode == 0 && !info.alphabet.isEmpty())
+        {
+            String firstSymbol = info.alphabet.get(0);  // 0 码对应符号
+            if (sbContent.toString().endsWith(firstSymbol))
+            {
+                // 移除收尾的无效符号
+                sbContent.setLength(sbContent.length() - firstSymbol.length());
+            }
+        }
         System.err.println("处理后的内容:"+sbContent);
         // 统一输出处理后的内容
         BinaryStdOut.write(sbContent.toString());
