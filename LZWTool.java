@@ -23,18 +23,21 @@ public class LZWTool
     public static void main(String[] args)
     {
         // Parse command-line arguments
-        String mode = "compress";
-        String inputFile ="TestFiles/test3.txt";
-        String outputFile ="TestFiles/test3_output.lzw";
+//        String mode = "compress";
+//        String inputFile ="TestFiles/test2.txt";
+//        String outputFile ="TestFiles/test2_output.lzw";
 
 //        String mode ="expand";
-//        String inputFile ="TestFiles/test3_output.lzw";
-//        String outputFile ="TestFiles/test3_back.txt";
+//        String inputFile ="TestFiles/test2_output.lzw";
+//        String outputFile ="TestFiles/test2_back.txt";
 
+        String mode=null;
         int minW = 3;
         int maxW = 4;
         String policy = "freeze";
-        String alphabetPath = "alphabets/toberh.txt";
+        //String alphabetPath = "alphabets/toberh.txt";
+//        String alphabetPath = "alphabets/abrcd.txt";
+        String alphabetPath=null;
 
         for (int i = 0; i < args.length; i++)
         {
@@ -50,7 +53,7 @@ public class LZWTool
                     maxW = Integer.parseInt(args[++i]);
                     break;
                 case "--policy":
-                    policy = args[++i];
+                    policy = "freeze";
                     break;
                 case "--alphabet":
                     alphabetPath = args[++i];
@@ -259,6 +262,9 @@ public class LZWTool
         int W = minW;
         int maxCodeLimit = (1 << maxW);
 
+        int stopCode = maxCodeLimit - 1; // 预留最大值为stopCode（如maxW=4时为15）
+
+
         // Build initial codebook: use HashMap for pattern->code so we can remove old patterns when evicting
         Map<String, Integer> codebook = new HashMap<>();
         Map<Integer, String> reverseCodebook = new HashMap<>();
@@ -269,6 +275,9 @@ public class LZWTool
             codebook.put(symbol, nextCode);
             reverseCodebook.put(nextCode, symbol);
             nextCode++;
+            if (nextCode >= stopCode) {
+                break; // 避免码表占用stopCode
+            }
         }
 
         // 打印初始Codebook
@@ -321,7 +330,8 @@ public class LZWTool
                 }
 
                 // Try to add new pattern
-                if (nextCode < maxCodeLimit)
+                //if (nextCode < maxCodeLimit)
+                if (nextCode < stopCode)
                 {
                     // Increase width if needed BEFORE adding the new code
                     if (nextCode == (1 << W) && W < maxW)
@@ -465,8 +475,8 @@ public class LZWTool
         }
         System.err.println("编码:"+sb.toString());
         // Write stop code (use maximum possible value for current width as EOF marker)
-//        int stopCode = (1 << W) - 1;
-//        BinaryStdOut.write(stopCode, W);
+        stopCode = (1 << W) - 1;
+        BinaryStdOut.write(stopCode, W);
 
         BinaryStdOut.close();
     }
@@ -533,11 +543,9 @@ public class LZWTool
         sbContent.append(prevString);
         System.err.println("内容:"+sbContent);
 
-        //BinaryStdOut.write(prevString);
+        BinaryStdOut.write(prevString);
         frequency.put(prevCode, frequency.getOrDefault(prevCode, 0) + 1);
         lastUsed.put(prevCode, timestamp++);
-
-        int lastCode = prevCode;  // 跟踪最后读取的码
 
         // Process remaining codes
         while (!BinaryStdIn.isEmpty())
@@ -548,7 +556,8 @@ public class LZWTool
                 W++;
             }
             System.err.println("字典下一code:"+nextCode+"当前码长:"+W);
-            if (nextCode == (1 << W) && W == info.maxW)
+            if (nextCode == (1 << W)-1 && W == info.maxW)
+            //if (nextCode == (1 << W) && W == info.maxW)
             {
                 if (info.policy.equals("reset"))
                 {
@@ -562,7 +571,6 @@ public class LZWTool
             try
             {
                 code = BinaryStdIn.readInt(W);
-                lastCode = code;  // 更新最后码值
             }
             catch (NoSuchElementException e)
             {
@@ -573,12 +581,12 @@ public class LZWTool
             System.err.println("编码:"+sbCode);
 
             // Check for stop code
-//            int stopCode = (1 << W) - 1;
-//            if (code == stopCode)
-//            {
-//                System.err.println("读到了stop code，退出");
-//                break;
-//            }
+            int stopCode = (1 << info.maxW) - 1;
+            if (code == stopCode)
+            {
+                System.err.println("读到stopCode，退出解压");
+                break;
+            }
 
             String entry;
 
@@ -598,7 +606,7 @@ public class LZWTool
             sbContent.append(entry);
             System.err.println("内容:"+sbContent);
 
-            //BinaryStdOut.write(entry);
+            BinaryStdOut.write(entry);
             frequency.put(code, frequency.getOrDefault(code, 0) + 1);
             lastUsed.put(code, timestamp++);
 
@@ -709,19 +717,7 @@ public class LZWTool
             prevString = entry;
             prevCode = code;
         }
-        // 剔除由填充比特导致的收尾 0 码对应内容
-        if (lastCode == 0 && !info.alphabet.isEmpty())
-        {
-            String firstSymbol = info.alphabet.get(0);  // 0 码对应符号
-            if (sbContent.toString().endsWith(firstSymbol))
-            {
-                // 移除收尾的无效符号
-                sbContent.setLength(sbContent.length() - firstSymbol.length());
-            }
-        }
-        System.err.println("处理后的内容:"+sbContent);
-        // 统一输出处理后的内容
-        BinaryStdOut.write(sbContent.toString());
+
         BinaryStdOut.close();
     }
 
