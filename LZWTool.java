@@ -53,7 +53,7 @@ public class LZWTool
                     maxW = Integer.parseInt(args[++i]);
                     break;
                 case "--policy":
-                    policy = "freeze";
+                    policy = args[++i];
                     break;
                 case "--alphabet":
                     alphabetPath = args[++i];
