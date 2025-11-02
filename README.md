@@ -27,7 +27,7 @@ The program must read input from **standard input** and write output to **standa
 
 ```
 /TestFiles/             //Files with different types and sizes for testing
-LZWTool.java            // Main class to write (This is the ONLY file that you can modify)
+LZWTool_local.java            // Main class to write (This is the ONLY file that you can modify)
 BinaryStdIn.java        //Textbook codehandouts for bit-by-bit I/O
 BinaryStdOut.java
 TSTMod.java             //TST Trie for possible codebook implementation in compression
@@ -51,7 +51,7 @@ Your program supports file compression from the command line.
 The following example shows how to compress a file named code.txt:
 
 ```bash
-java LZWTool --mode compress --minW 9 --maxW 16 --policy lru --alphabet alphabets/ascii.txt < TestFiles/code.txt > code.lzw
+java LZWTool_local --mode compress --minW 9 --maxW 16 --policy lru --alphabet alphabets/ascii.txt < TestFiles/code.txt > code.lzw
 ```
 
 ### Expand
@@ -60,7 +60,7 @@ Your program supports file expansion from the command line.
 The example below shows how to decompress the file code.lzw that was created in the previous step:
 
 ```bash
-java LZWTool --mode expand < code.lzw > restored.txt
+java LZWTool_local --mode expand < code.lzw > restored.txt
 ```
 
 ---
@@ -198,8 +198,8 @@ You can verify your program by performing a **round-trip test**: compress a file
 ### Example (Linux/macOS)
 
 ```bash
-java LZWTool --mode compress --alphabet ascii.txt < input.txt > output.lzw
-java LZWTool --mode expand < output.lzw > restored.txt
+java LZWTool_local --mode compress --alphabet ascii.txt < input.txt > output.lzw
+java LZWTool_local --mode expand < output.lzw > restored.txt
 diff input.txt restored.txt
 ```
 
@@ -210,8 +210,8 @@ If the output from `diff` is empty, your implementation is correct.
 Use the `fc` command with binary comparison:
 
 ```cmd
-java LZWTool --mode compress --alphabet ascii.txt < input.txt > output.lzw
-java LZWTool --mode expand < output.lzw > restored.txt
+java LZWTool_local --mode compress --alphabet ascii.txt < input.txt > output.lzw
+java LZWTool_local --mode expand < output.lzw > restored.txt
 fc /B input.txt restored.txt
 ```
 
@@ -239,8 +239,8 @@ This writes to the **standard error stream**, which still appears in the termina
 To capture debug logs in files for side-by-side comparison:
 
 ```bash
-java LZWTool --mode compress ... 2> debug-compress.txt
-java LZWTool --mode expand ... 2> debug-expand.txt
+java LZWTool_local --mode compress ... 2> debug-compress.txt
+java LZWTool_local --mode expand ... 2> debug-expand.txt
 ```
 
 You can then open `debug-compress.txt` and `debug-expand.txt` together to trace encoding and decoding steps.
@@ -262,7 +262,7 @@ Focus debugging output on iterations just **before and after width increases or 
 
 Submit your completed Java project to GradeScope:
 
-* `LZWTool.java` is the ONLY file that you are allowed to submit
+* `LZWTool_local.java` is the ONLY file that you are allowed to submit
 ---
 ## **📊 Grading Rubric**
 
