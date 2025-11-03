@@ -289,7 +289,7 @@ public class LZWTool
         // Tracking for eviction policies
         Map<Integer, Integer> frequency = new HashMap<>();
         Map<Integer, Integer> lastUsed = new HashMap<>();
-        int timestamp = 0;
+        int timestamp = 1;
 
         for (int i = 0; i < alphabet.size(); i++)
         {
@@ -345,7 +345,7 @@ public class LZWTool
                     codebook.put(nextStr, nextCode);
                     reverseCodebook.put(nextCode, nextStr);
                     frequency.put(nextCode, 0);
-                    lastUsed.put(nextCode, timestamp);
+                    lastUsed.put(nextCode, timestamp++);
                     nextCode++;
 
                     // 打印更新后的Codebook
@@ -368,7 +368,7 @@ public class LZWTool
                             codebook.put(symbol, nextCode);
                             reverseCodebook.put(nextCode, symbol);
                             frequency.put(nextCode, 0);
-                            lastUsed.put(nextCode, timestamp);
+                            lastUsed.put(nextCode, timestamp++);
                             nextCode++;
                         }
 
@@ -383,7 +383,7 @@ public class LZWTool
                         codebook.put(nextStr, nextCode);
                         reverseCodebook.put(nextCode, nextStr);
                         frequency.put(nextCode, 0);
-                        lastUsed.put(nextCode, timestamp);
+                        lastUsed.put(nextCode, timestamp++);
                         nextCode++;
 
 //                        printCodebook(reverseCodebook, "reset码表后");
@@ -420,7 +420,7 @@ public class LZWTool
                             codebook.put(nextStr, lruCode);
                             reverseCodebook.put(lruCode, nextStr);
                             frequency.put(lruCode, 0);
-                            lastUsed.put(lruCode, timestamp);
+                            lastUsed.put(lruCode, timestamp++);
                         }
 //                        printCodebook(reverseCodebook, "lru更新码表后");
                     }
@@ -455,7 +455,7 @@ public class LZWTool
                             codebook.put(nextStr, lfuCode);
                             reverseCodebook.put(lfuCode, nextStr);
                             frequency.put(lfuCode, 0);
-                            lastUsed.put(lfuCode, timestamp);
+                            lastUsed.put(lfuCode, timestamp++);
                         }
 //                        printCodebook(reverseCodebook, "lfu更新码表后");
                     }
@@ -509,7 +509,7 @@ public class LZWTool
         // Tracking for eviction policies
         Map<Integer, Integer> frequency = new HashMap<>();
         Map<Integer, Integer> lastUsed = new HashMap<>();
-        int timestamp = 0;
+        int timestamp = 1;
 
         for (int i = 0; i < info.alphabet.size(); i++)
         {
@@ -605,13 +605,16 @@ public class LZWTool
             {
                 throw new RuntimeException("Invalid code: " + code);
             }
-            sbContent.append(entry);
-            //System.err.println("内容:"+sbContent);
-
-            BinaryStdOut.write(entry);
-            frequency.put(code, frequency.getOrDefault(code, 0) + 1);
-            lastUsed.put(code, timestamp++);
-
+//            sbContent.append(entry);
+//            //System.err.println("内容:"+sbContent);
+//
+//            BinaryStdOut.write(entry);
+//            frequency.put(code, frequency.getOrDefault(code, 0) + 1);
+//            if (code!= nextCode){
+//                lastUsed.put(code, timestamp++);
+//                printCodebook(lastUsed, "current刷新时间戳");
+//            }
+//            printCodebook(lastUsed, "current刷新时间戳");
             // Add new entry to codebook
             //if (nextCode < maxCodeLimit)
             if (nextCode < maxCodeLimit-1)
@@ -625,7 +628,7 @@ public class LZWTool
                 String newEntry = prevString + entry.charAt(0);
                 codebook.put(nextCode, newEntry);
                 frequency.put(nextCode, 0);
-                lastUsed.put(nextCode, timestamp);
+                lastUsed.put(nextCode, timestamp++);
                 nextCode++;
 //                printCodebook(codebook, "添加新码表后");
             }
@@ -642,7 +645,7 @@ public class LZWTool
                     {
                         codebook.put(nextCode, symbol);
                         frequency.put(nextCode, 0);
-                        lastUsed.put(nextCode, timestamp);
+                        lastUsed.put(nextCode, timestamp++);
                         nextCode++;
                     }
 
@@ -657,7 +660,7 @@ public class LZWTool
                     String newEntry = prevString + entry.charAt(0);
                     codebook.put(nextCode, newEntry);
                     frequency.put(nextCode, 0);
-                    lastUsed.put(nextCode, timestamp);
+                    lastUsed.put(nextCode, timestamp++);
                     nextCode++;
                 }
                 else if (info.policy.equals("lru"))
@@ -677,14 +680,24 @@ public class LZWTool
                                 lruCode = i;
                             }
                         }
-                    }
+                        codebook.remove(lruCode);
+                        if (codebook.containsKey(code))
+                        {
+                            entry = codebook.get(code);
+                        }
+                        else
+                        {
+                            // Special case: code not yet in codebook
+                            entry = prevString + prevString.charAt(0);
+                        }
 
-                    if (lruCode >= 0)
-                    {
-                        String newEntry = prevString + entry.charAt(0);
-                        codebook.put(lruCode, newEntry);
-                        frequency.put(lruCode, 0);
-                        lastUsed.put(lruCode, timestamp);
+                        if (lruCode >= 0)
+                        {
+                            String newEntry = prevString + entry.charAt(0);
+                            codebook.put(lruCode, newEntry);
+                            frequency.put(lruCode, 0);
+                            lastUsed.put(lruCode, timestamp);
+                        }
                     }
                 }
                 else if (info.policy.equals("lfu"))
@@ -711,19 +724,40 @@ public class LZWTool
                         String newEntry = prevString + entry.charAt(0);
                         codebook.put(lfuCode, newEntry);
                         frequency.put(lfuCode, 0);
-                        lastUsed.put(lfuCode, timestamp);
+                        lastUsed.put(lfuCode, timestamp++);
                     }
                 }
-                // else freeze - do nothing
+                    // else freeze - do nothing
+                }
+                if (codebook.containsKey(code))
+                {
+                    entry = codebook.get(code);
+                }
+                else if (code == nextCode)
+                {
+                    // Special case: code not yet in codebook
+                    entry = prevString + prevString.charAt(0);
+                }
+                else
+                {
+//                    errorPrintCodebook(codebook, "出错时码表");
+                    throw new RuntimeException("Invalid code: " + code);
+                }
+
+                sbContent.append(entry);
+                System.err.println("内容:"+sbContent);
+
+                BinaryStdOut.write(entry);
+                frequency.put(code, frequency.getOrDefault(code, 0) + 1);
+                lastUsed.put(code, timestamp++);
+//                printCodebook(lastUsed, "current刷新时间戳");
+
+                prevString = entry;
+                prevCode = code;
             }
 
-            prevString = entry;
-            prevCode = code;
+            BinaryStdOut.close();
         }
-
-        BinaryStdOut.close();
-    }
-
     /**
      * Helper class to store header information
      */
