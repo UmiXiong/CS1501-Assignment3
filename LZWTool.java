@@ -727,37 +727,37 @@ public class LZWTool
                         lastUsed.put(lfuCode, timestamp++);
                     }
                 }
-                    // else freeze - do nothing
-                }
-                if (codebook.containsKey(code))
-                {
-                    entry = codebook.get(code);
-                }
-                else if (code == nextCode)
-                {
-                    // Special case: code not yet in codebook
-                    entry = prevString + prevString.charAt(0);
-                }
-                else
-                {
+                // else freeze - do nothing
+            }
+            if (codebook.containsKey(code))
+            {
+                entry = codebook.get(code);
+            }
+            else if (code == nextCode)
+            {
+                // Special case: code not yet in codebook
+                entry = prevString + prevString.charAt(0);
+            }
+            else
+            {
 //                    errorPrintCodebook(codebook, "出错时码表");
-                    throw new RuntimeException("Invalid code: " + code);
-                }
-
-                sbContent.append(entry);
-                System.err.println("内容:"+sbContent);
-
-                BinaryStdOut.write(entry);
-                frequency.put(code, frequency.getOrDefault(code, 0) + 1);
-                lastUsed.put(code, timestamp++);
-//                printCodebook(lastUsed, "current刷新时间戳");
-
-                prevString = entry;
-                prevCode = code;
+                throw new RuntimeException("Invalid code: " + code);
             }
 
-            BinaryStdOut.close();
+            sbContent.append(entry);
+            System.err.println("内容:"+sbContent);
+
+            BinaryStdOut.write(entry);
+            frequency.put(code, frequency.getOrDefault(code, 0) + 1);
+            lastUsed.put(code, timestamp++);
+//                printCodebook(lastUsed, "current刷新时间戳");
+
+            prevString = entry;
+            prevCode = code;
         }
+
+        BinaryStdOut.close();
+    }
     /**
      * Helper class to store header information
      */

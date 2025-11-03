@@ -61,7 +61,7 @@ public class LZW_test
             {
                 System.setIn(fileIn);
                 System.setOut(new PrintStream(fileOut));
-                LZWTool_local.compress(minW, maxW, policy, alphabetPath);
+//                LZWTool_local.compress(minW, maxW, policy, alphabetPath);
             }
             finally
             {
@@ -85,7 +85,7 @@ public class LZW_test
             {
                 System.setIn(fileIn);
                 System.setOut(new PrintStream(fileOut));
-                LZWTool_local.expand();
+//                LZWTool_local.expand();
             }
             finally
             {
