@@ -745,7 +745,7 @@ public class LZWTool
             }
 
             sbContent.append(entry);
-            System.err.println("内容:"+sbContent);
+//            System.err.println("内容:"+sbContent);
 
             BinaryStdOut.write(entry);
             frequency.put(code, frequency.getOrDefault(code, 0) + 1);
