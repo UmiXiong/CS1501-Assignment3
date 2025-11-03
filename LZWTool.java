@@ -35,7 +35,7 @@ public class LZWTool
 
 //
 
-//        final tries
+//
         String mode=null;
         int minW = 9;
         int maxW = 16;
